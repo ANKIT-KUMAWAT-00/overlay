@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DomainTypes",
+  "definitions": {
+    "CaptureContext": {
+      "type": "object",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "image_bytes": {
+          "type": "string",
+          "contentEncoding": "base64"
+        },
+        "source_app": {
+          "type": "string"
+        },
+        "window_title": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "timestamp",
+        "source_app"
+      ]
+    },
+    "AnswerPayload": {
+      "type": "object",
+      "properties": {
+        "raw_content": {
+          "type": "string"
+        },
+        "sanitized_content": {
+          "type": "string"
+        },
+        "output_format": {
+          "type": "string",
+          "enum": [
+            "python",
+            "cpp",
+            "java",
+            "sql",
+            "json",
+            "text"
+          ]
+        },
+        "validated": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "sanitized_content",
+        "output_format",
+        "validated"
+      ]
+    }
+  }
+}
