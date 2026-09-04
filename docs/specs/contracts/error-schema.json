@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ErrorContract",
+  "type": "object",
+  "properties": {
+    "error_code": {
+      "type": "string"
+    },
+    "message": {
+      "type": "string"
+    },
+    "subsystem": {
+      "type": "string"
+    },
+    "retryable": {
+      "type": "boolean"
+    },
+    "attempt_number": {
+      "type": "integer"
+    },
+    "backoff_seconds": {
+      "type": "number"
+    },
+    "context": {
+      "type": "object"
+    }
+  },
+  "required": [
+    "error_code",
+    "message",
+    "subsystem",
+    "retryable"
+  ]
+}
