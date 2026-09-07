@@ -1,0 +1,24 @@
+{
+  "test_cases": [
+    {
+      "case": "dark_mode_editor",
+      "contrast_ratio": 7.2,
+      "expected_accuracy": 0.98
+    },
+    {
+      "case": "light_mode_browser",
+      "contrast_ratio": 12.1,
+      "expected_accuracy": 0.99
+    },
+    {
+      "case": "rotated_five_degrees",
+      "skew_deg": 5.0,
+      "expected_accuracy": 0.92
+    },
+    {
+      "case": "retina_scaled_2x",
+      "scale": 2.0,
+      "expected_accuracy": 0.99
+    }
+  ]
+}
