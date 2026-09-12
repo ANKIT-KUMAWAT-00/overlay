@@ -1,0 +1,6 @@
+{
+  "test_name": "rapid_capture_cycles",
+  "cycle_count": 500,
+  "max_memory_growth_mb": 15.0,
+  "timeout_per_cycle_ms": 100
+}
