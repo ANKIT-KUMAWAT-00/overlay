@@ -1,0 +1,14 @@
+[
+  {
+    "raw": "{\"items\": [{\"id\": 1, \"name\": \"test\"}",
+    "expected_success": true
+  },
+  {
+    "raw": "{\"config\": {\"debug\": true",
+    "expected_success": true
+  },
+  {
+    "raw": "[1, 2, 3, {\"a\": [4, 5",
+    "expected_success": true
+  }
+]
