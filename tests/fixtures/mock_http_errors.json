@@ -1,0 +1,17 @@
+[
+  {
+    "status_code": 429,
+    "error": "RESOURCE_EXHAUSTED",
+    "retry_after": 2.0
+  },
+  {
+    "status_code": 503,
+    "error": "UNAVAILABLE",
+    "retry_after": 1.5
+  },
+  {
+    "status_code": 401,
+    "error": "INVALID_ARGUMENT",
+    "retry_after": null
+  }
+]
