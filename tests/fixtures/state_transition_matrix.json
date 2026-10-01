@@ -1,0 +1,32 @@
+{
+  "valid_transitions": [
+    {
+      "from": "IDLE",
+      "to": "ACTIVATING"
+    },
+    {
+      "from": "ACTIVATING",
+      "to": "CAPTURING"
+    },
+    {
+      "from": "CAPTURING",
+      "to": "GENERATING"
+    },
+    {
+      "from": "GENERATING",
+      "to": "VALIDATING"
+    },
+    {
+      "from": "VALIDATING",
+      "to": "READY"
+    },
+    {
+      "from": "READY",
+      "to": "DELIVERING"
+    },
+    {
+      "from": "DELIVERING",
+      "to": "COMPLETED"
+    }
+  ]
+}
