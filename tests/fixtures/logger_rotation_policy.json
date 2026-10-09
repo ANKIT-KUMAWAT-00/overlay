@@ -1,0 +1,5 @@
+{
+  "max_file_size_bytes": 10485760,
+  "backup_count": 5,
+  "fallback_dir": "/tmp/omniassist_logs"
+}
