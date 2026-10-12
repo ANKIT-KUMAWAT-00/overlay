@@ -1,0 +1,16 @@
+{
+  "scenarios": [
+    {
+      "name": "leetcode_easy",
+      "expected_status": "COMPLETED"
+    },
+    {
+      "name": "syntax_repair",
+      "expected_status": "AUTO_REPAIRED"
+    },
+    {
+      "name": "offline_mode",
+      "expected_status": "NETWORK_UNAVAILABLE"
+    }
+  ]
+}
