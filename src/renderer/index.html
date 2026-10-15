@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Universal AI Assistant</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="hud-container">
+    <!-- Top Drag / Title Bar -->
+    <header class="hud-header">
+      <div class="header-left">
+        <div class="app-logo">
+          <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+            <polyline points="2 17 12 22 22 17"></polyline>
+            <polyline points="2 12 12 17 22 12"></polyline>
+          </svg>
+          <span class="logo-text">OmniAssist</span>
+        </div>
+        <div id="targetPill" class="target-pill" title="Currently active desktop target">
+          <span class="target-dot"></span>
+          <span id="targetName">Active Desktop</span>
+        </div>
+      </div>
+      <div class="header-right">
+        <button id="btnSettings" class="icon-btn" title="Settings & API Key" aria-label="Settings">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+        <button id="btnClose" class="icon-btn close-btn" title="Dismiss (Escape)" aria-label="Close">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Workflow Lifecycle Progress Bar -->
+    <div class="stepper-bar">
+      <div id="stepCapture" class="step-item"><span class="step-dot"></span>Capture</div>
+      <div id="stepGenerate" class="step-item"><span class="step-dot"></span>Gemini AI</div>
+      <div id="stepValidate" class="step-item"><span class="step-dot"></span>Validate</div>
+      <div id="stepReady" class="step-item"><span class="step-dot"></span>Ready</div>
+      <div id="stepDeliver" class="step-item"><span class="step-dot"></span>Deliver</div>
+    </div>
+
+    <!-- Status Message Banner -->
+    <div id="statusBar" class="status-banner">
+      <span class="status-spinner" id="statusSpinner"></span>
+      <span id="statusMessage" class="status-text">Ready for interaction.</span>
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="hud-main">
+      <!-- Question / Context Section -->
+      <section class="section-card question-card">
+        <div class="card-header">
+          <span class="card-title">Question / Context</span>
+          <div class="capture-pills">
+            <button class="pill-btn active" data-method="selected_text">Selection</button>
+            <button class="pill-btn" data-method="screen_ocr">OCR</button>
+            <button class="pill-btn" data-method="clipboard">Clipboard</button>
+          </div>
+        </div>
+        <textarea id="questionInput" class="custom-textarea" rows="3" placeholder="Select text and press shortcut, or type question here..."></textarea>
+        <div class="card-footer">
+          <span id="captureSourceBadge" class="source-badge">Source: Manual</span>
+          <button id="btnRunQuery" class="action-btn secondary-btn">Generate Answer</button>
+        </div>
+      </section>
+
+      <!-- Answer Preview Section -->
+      <section class="section-card answer-card">
+        <div class="card-header">
+          <span class="card-title">Generated Answer</span>
+          <span id="formatBadge" class="format-badge">Raw Code</span>
+        </div>
+        <div id="answerDisplayContainer" class="answer-container">
+          <pre id="answerCodeBlock" class="answer-code"><code>Waiting for question...</code></pre>
+        </div>
+        <div class="answer-actions">
+          <button id="btnInsert" class="action-btn primary-btn" disabled>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path>
+              <polyline points="10 17 15 12 10 7"></polyline>
+              <line x1="15" y1="12" x2="3" y2="12"></line>
+            </svg>
+            Insert Answer (Alt+Enter)
+          </button>
+          <button id="btnCopy" class="action-btn secondary-btn" disabled>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            Copy
+          </button>
+          <button id="btnCancel" class="action-btn cancel-btn">Cancel</button>
+        </div>
+      </section>
+    </main>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal-backdrop hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2 class="modal-title">Assistant Configuration</h2>
+          <button id="btnCloseSettings" class="icon-btn">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="apiKeyInput">Gemini API Key</label>
+            <div class="input-with-toggle">
+              <input type="password" id="apiKeyInput" placeholder="Enter your Gemini API key (e.g. AIzaSy...)" autocomplete="off">
+              <button id="btnToggleKey" type="button" class="text-btn">Show</button>
+            </div>
+            <p class="field-hint">Never hardcoded. Kept securely in memory and never logged.</p>
+          </div>
+
+          <div class="form-group">
+            <label for="modelSelect">AI Model</label>
+            <select id="modelSelect" class="custom-select">
+              <option value="gemini-2.5-flash">Gemini 2.5 Flash (Fast, High Quality)</option>
+              <option value="gemini-2.5-pro">Gemini 2.5 Pro (Deep Reasoning & Complex Code)</option>
+              <option value="gemini-2.0-flash">Gemini 2.0 Flash (Fast Fallback)</option>
+            </select>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group half">
+              <label for="activationShortcutInput">Activation Shortcut</label>
+              <input type="text" id="activationShortcutInput" value="Command+Shift+Z">
+            </div>
+            <div class="form-group half">
+              <label for="insertionShortcutInput">Insertion Shortcut</label>
+              <input type="text" id="insertionShortcutInput" value="Alt+Enter">
+            </div>
+          </div>
+
+          <div class="form-group checkbox-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="privacyModeCheck" checked>
+              <span>Strict Privacy Mode (Zero persistent history retention)</span>
+            </label>
+          </div>
+
+          <div class="permissions-status">
+            <div class="perm-title">OS Permissions:</div>
+            <div class="perm-chips">
+              <span id="permScreen" class="perm-chip">Screen Recording: Checking...</span>
+              <span id="permAccess" class="perm-chip">Accessibility: Checking...</span>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="btnSaveSettings" class="action-btn primary-btn">Save Settings</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
