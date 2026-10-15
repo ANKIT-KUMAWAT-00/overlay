@@ -1,0 +1,58 @@
+{
+  "name": "universal-desktop-assistant",
+  "version": "1.0.0",
+  "description": "Universal Cross-Platform AI Computer Interaction Assistant",
+  "type": "module",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "build": "tsc",
+    "build:renderer": "tsc -p tsconfig.renderer.json",
+    "start": "electron .",
+    "dev": "tsc && electron .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit",
+    "pack:mac": "electron-builder --mac",
+    "pack:win": "electron-builder --win",
+    "pack:dir": "electron-builder --dir"
+  },
+  "build": {
+    "appId": "com.antigravity.omniassistant",
+    "productName": "OmniAssist",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "src/renderer/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": ["dmg", "zip"]
+    },
+    "win": {
+      "target": ["nsis", "portable"]
+    }
+  },
+  "keywords": [
+    "ai",
+    "desktop-automation",
+    "gemini",
+    "electron",
+    "accessibility",
+    "cross-platform"
+  ],
+  "author": "Antigravity Engineering",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@google/genai": "^2.30.0",
+    "tesseract.js": "^5.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "electron": "^33.2.0",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
