@@ -71,3 +71,23 @@ def test_response_validator_truncation_detection():
     result = validator.validate(raw, expected_format=OutputFormat.CODE)
 
     assert result.is_truncated
+
+
+def test_response_validator_extracts_code_from_analysis_commentary():
+    validator = ResponseValidator()
+    raw = (
+        "### Problem Analysis: 37. Sudoku Solver\n"
+        "The task is to solve a 9x9 Sudoku puzzle...\n\n"
+        "### Python Implementation\n"
+        "```python\n"
+        "class Solution:\n"
+        "    def solveSudoku(self, board):\n"
+        "        pass\n"
+        "```\n\n"
+        "### Complexity Analysis\n"
+        "* Time Complexity: O(9^m)\n"
+    )
+    result = validator.validate(raw, expected_format=OutputFormat.CODE)
+    assert result.is_valid
+    assert result.corrected_text == "class Solution:\n    def solveSudoku(self, board):\n        pass"
+    assert "Extracted pure solution code" in result.warnings[0]

@@ -76,18 +76,40 @@ class ResponseValidator:
             if stripped_any:
                 warnings.append("Stripped conversational introductory prefix.")
 
-        # Step 2: Strip outer Markdown code fences if raw code/json was requested
-        if expected_format in (OutputFormat.CODE, OutputFormat.JSON):
+        # Step 2: Strip outer Markdown code fences or extract embedded code from analysis chatter
+        if expected_format in (OutputFormat.CODE, OutputFormat.JSON) or (
+            expected_format == OutputFormat.AUTO and "```" in corrected
+        ):
             match = CODE_FENCE_REGEX.match(corrected)
             if match:
                 corrected = match.group(1).strip()
                 warnings.append("Extracted content from outer markdown code fences.")
-            elif corrected.startswith("```") and corrected.endswith("```"):
-                # Handle single-line or slight variants
+            elif corrected.startswith("```") and corrected.endswith("```") and corrected.count("```") == 2:
                 lines = corrected.splitlines()
                 if len(lines) >= 2 and lines[0].startswith("```") and lines[-1].strip() == "```":
                     corrected = "\n".join(lines[1:-1]).strip()
-                    warnings.append("Stripped outer markdown fences.")
+                    warnings.append("Extracted content from outer markdown code fences.")
+            else:
+                embedded_blocks = re.findall(r"```(?:[a-zA-Z0-9_\-\.\+#]+)?\n([\s\S]*?)\n```", corrected)
+                if embedded_blocks:
+                    largest_code = max(embedded_blocks, key=len).strip()
+                    if (
+                        expected_format in (OutputFormat.CODE, OutputFormat.JSON)
+                        or any(
+                            term in corrected.lower()
+                            for term in (
+                                "problem analysis",
+                                "implementation",
+                                "solution approach",
+                                "complexity analysis",
+                                "class solution",
+                                "def ",
+                                "function ",
+                            )
+                        )
+                    ):
+                        corrected = largest_code
+                        warnings.append("Extracted pure solution code, stripping surrounding analysis and commentary.")
 
         # Step 3: Format-specific syntax checking
         has_syntax_errors = False

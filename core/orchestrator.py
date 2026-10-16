@@ -129,7 +129,7 @@ class AssistantOrchestrator:
                 prompt_text = (
                     manual_prompt.strip()
                     if (manual_prompt and manual_prompt.strip())
-                    else "Carefully read and analyze the screen. Identify the question, coding problem, or task shown on the screen, and provide the complete, accurate solution or answer."
+                    else "Carefully read and analyze the screen. If this is a coding problem or task, output ONLY the complete, working code solution ready to be executed (omit problem analysis, explanation essays, and complexity analysis). If it is a multiple choice or other task, give the exact direct answer."
                 )
                 captured = CapturedQuestion(
                     text=prompt_text,

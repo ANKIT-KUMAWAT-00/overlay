@@ -13,7 +13,7 @@ from logging_service.logger import get_logger
 logger = get_logger("ai.prompt_builder")
 
 CODE_KEYWORD_REGEX = re.compile(
-    r"\b(code|function|class|def|import|sql|javascript|python|typescript|java|cpp|c\+\+|html|css|algorithm|bug|fix|refactor|regex)\b",
+    r"\b(code|coding|program|programming|function|class|def|import|sql|javascript|python|typescript|java|cpp|c\+\+|c#|golang|rust|html|css|algorithm|bug|fix|refactor|regex|leetcode|hackerrank|solver|solve|solution|implementation|sudoku|array|string|list|tree|graph|dp|backtrack|matrix)\b",
     re.IGNORECASE,
 )
 MCQ_KEYWORD_REGEX = re.compile(
@@ -51,9 +51,9 @@ class PromptBuilder:
     def build_system_instruction(self, format_preference: OutputFormat, target_app: Optional[str] = None) -> str:
         """Returns targeted system instruction for the chosen output format."""
         base_instruction = (
-            "You are OmniAssist, a world-class AI desktop interaction assistant. "
-            "You provide accurate, immediate solutions to computer tasks. "
-            "Follow the requested format strictly."
+            "You are OmniAssist, a high-precision AI desktop assistant for developers and professionals. "
+            "Your output is directly inserted into active applications via hotkeys. "
+            "You MUST follow the requested format strictly."
         )
 
         app_context = f" The user is actively working in: {target_app}." if target_app else ""
@@ -61,9 +61,12 @@ class PromptBuilder:
         if format_preference == OutputFormat.CODE:
             return (
                 f"{base_instruction}{app_context} "
-                "CRITICAL FORMAT RULE: The user needs raw code for direct insertion. "
-                "Output ONLY valid, executable code without conversational intros, explanations, or Markdown code fences "
-                "unless specifically asked to format as Markdown. Preserve exact indentation and syntax."
+                "CRITICAL FORMAT RULE: The user needs direct raw code for immediate insertion and compilation/execution. "
+                "Output ONLY the clean, valid, executable solution code. "
+                "STRICTLY FORBIDDEN: Do NOT include conversational introductions, explanations, 'Problem Analysis', "
+                "'Solution Approach', or 'Complexity Analysis' sections. "
+                "Do NOT wrap in markdown fences or add commentary unless specifically requested. "
+                "Provide ONLY the code itself with proper indentation and imports."
             )
 
         if format_preference == OutputFormat.MULTIPLE_CHOICE:
@@ -96,8 +99,9 @@ class PromptBuilder:
         # OutputFormat.THEORY or AUTO
         return (
             f"{base_instruction}{app_context} "
-            "Provide a clear, well-structured, precise explanation. "
-            "Use bullet points or structured headers if helpful. Avoid unnecessary fluff."
+            "Provide a direct, accurate, and concise solution. "
+            "If the problem is a coding or algorithm task, provide the complete working code directly without "
+            "unnecessary introductory analysis essays, verbose problem breakdowns, or redundant complexity sections."
         )
 
     def assemble_user_prompt(
