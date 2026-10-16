@@ -202,6 +202,11 @@ class AnswerWindow(QWidget):
         self.btn_copy.clicked.connect(self._on_copy_clicked)
         bottom_bar.addWidget(self.btn_copy)
 
+        self.btn_code_only = QPushButton("💻 Code Only")
+        self.btn_code_only.setToolTip("Strip problem analysis and complexity commentary, keeping only pure code")
+        self.btn_code_only.clicked.connect(self._on_code_only_clicked)
+        bottom_bar.addWidget(self.btn_code_only)
+
         self.btn_insert = QPushButton(f"⚡ Insert into {self.target_app_name} (⌥+Enter)")
         self.btn_insert.setObjectName("PrimaryButton")
         self.btn_insert.clicked.connect(self._on_insert_clicked)
@@ -255,6 +260,23 @@ class AnswerWindow(QWidget):
         self.copy_requested.emit(text)
         self.btn_copy.setText("✓ Copied!")
         QTimer.singleShot(2000, lambda: self.btn_copy.setText("📋 Copy to Clipboard"))
+
+    def _on_code_only_clicked(self) -> None:
+        import re
+        current_text = self.answer_viewer.toPlainText()
+        embedded = re.findall(r"```(?:[a-zA-Z0-9_\-\.\+#]+)?\n([\s\S]*?)\n```", current_text)
+        if embedded:
+            largest = max(embedded, key=len).strip()
+            self.answer_viewer.setPlainText(largest)
+            self.btn_code_only.setText("✓ Extracted!")
+            QTimer.singleShot(1500, lambda: self.btn_code_only.setText("💻 Code Only"))
+        else:
+            # If no code fences, check if there are markdown headers to strip
+            lines = current_text.splitlines()
+            cleaned_lines = [l for l in lines if not l.strip().startswith("###") and not l.strip().startswith("**Time Complexity") and not l.strip().startswith("*   **")]
+            self.answer_viewer.setPlainText("\n".join(cleaned_lines).strip())
+            self.btn_code_only.setText("✓ Cleaned!")
+            QTimer.singleShot(1500, lambda: self.btn_code_only.setText("💻 Code Only"))
 
     def _on_insert_clicked(self) -> None:
         text = self.answer_viewer.toPlainText()

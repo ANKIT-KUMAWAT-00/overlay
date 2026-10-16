@@ -136,7 +136,7 @@ class QuestionCaptureService:
                 img_bytes = self.screen_capture.image_to_bytes(screenshot, format="JPEG", quality=80)
                 logger.info("Captured fullscreen image for Gemini Vision analysis (%d bytes)", len(img_bytes))
                 return CapturedQuestion(
-                    text="Carefully read and analyze the screen. Identify the question, coding problem, or task shown on the screen, and provide the complete, accurate solution or answer.",
+                    text="Carefully read and analyze the screen. If this is a coding problem or task, output ONLY the complete, working code solution ready to be executed (omit problem analysis, explanation essays, and complexity analysis). If it is a multiple choice or other task, give the exact direct answer.",
                     method=CaptureMethod.FULLSCREEN_VISION,
                     source_app=source_app,
                     window_title=window_title,
