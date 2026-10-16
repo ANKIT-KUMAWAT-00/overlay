@@ -1,43 +1,19 @@
-# Universal AI Computer Interaction Assistant (OmniAssist)
+# OmniAssist: Universal Python-Based AI Desktop Assistant
 
-A production-oriented, cross-platform desktop application that acts as an intelligent computer interaction assistant. Powered by Google Gemini AI, it seamlessly reads context from target applications, generates structured code or answers, validates syntax and completeness, and delivers answers directly into user workflows with robust recovery policies.
-
----
-
-## Table of Contents
-
-1. [Architectural Overview](#architectural-overview)
-2. [Framework Evaluation: Electron vs Tauri](#framework-evaluation-electron-vs-tauri)
-3. [Global Shortcuts & Activation Model](#global-shortcuts--activation-model)
-4. [Subsystem Architecture](#subsystem-architecture)
-   - [Explicit State Machine](#1-explicit-state-machine)
-   - [Master Recovery Manager](#2-master-recovery-manager)
-   - [Application Interaction Engine & Adapters](#3-application-interaction-engine--adapters)
-   - [Question Capture Engine](#4-question-capture-engine)
-   - [Gemini AI Answer Engine](#5-gemini-ai-answer-engine)
-   - [Answer Validation Engine](#6-answer-validation-engine)
-   - [Answer Delivery Engine](#7-answer-delivery-engine)
-   - [Security, Privacy & Prompt Injection Defense](#8-security-privacy--prompt-injection-defense)
-5. [Application Coverage Matrix](#application-coverage-matrix)
-6. [How to Add a New Application Adapter](#how-to-add-a-new-application-adapter)
-7. [Getting Started & Installation](#getting-started--installation)
-8. [Operating System Permissions](#operating-system-permissions)
-9. [Automated Testing Suite](#automated-testing-suite)
-10. [Packaging & Distribution](#packaging--distribution)
-11. [Troubleshooting](#troubleshooting)
+A production-grade, modular, cross-platform AI computer-interaction assistant built entirely in **Python**. Powered by **Google Gemini AI**, OmniAssist seamlessly captures context from active desktop applications (via selection hooks, accessibility trees, screen-region OCR, and multimodal vision), formulates targeted responses, rigorously validates syntax and completeness, and injects answers directly into user workflows with zero data loss.
 
 ---
 
-## Architectural Overview
+## 1. Architectural Overview
 
-OmniAssist implements a decoupled, capability-aware, layered architecture where the user interface, orchestration state machine, AI services, and operating system automation layer are cleanly isolated.
+OmniAssist implements a decoupled, event-driven, capability-aware layered architecture where the user interface, finite state machine, AI reasoning engine, and operating system automation layers are cleanly isolated.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│               Modern Dark Glassmorphic HUD Window               │
-│        (Question Preview, Answer Code Block, Settings Modal)    │
+│               Modern Dark Glassmorphic PySide6 HUD              │
+│        (Question Preview, Code Viewer, Settings Modal, Tray)    │
 └───────────────────────────────┬─────────────────────────────────┘
-                                │ Typed ContextBridge IPC
+                                │ Safe Thread-Safe Qt Signals
 ┌───────────────────────────────▼─────────────────────────────────┐
 │                    Master State Machine                         │
 │   (IDLE -> ACTIVATING -> CAPTURING -> GENERATING -> VALIDATING  │
@@ -46,295 +22,259 @@ OmniAssist implements a decoupled, capability-aware, layered architecture where 
             │                   │                    │
 ┌───────────▼─────────┐ ┌───────▼──────────┐ ┌───────▼────────────┐
 │  Question Capture   │ │ Gemini AI Engine │ │  Answer Validation │
-│  - Selected Text    │ │ - Gemini 2.5     │ │  - Syntax AST/JSON │
-│  - Accessibility    │ │ - Bounded Retry  │ │  - Truncation      │
-│  - Screen OCR       │ │ - Redaction      │ │  - Auto-Correction │
-│  - Clipboard/Manual │ │ - AbortSignal    │ │  - Signatures      │
+│  - Text Selection   │ │ - google-genai   │ │  - AST Syntax Check│
+│  - Accessibility AX │ │ - Bounded Retry  │ │  - JSON Auto-Repair│
+│  - Tesseract OCR    │ │ - PII Redaction  │ │  - Delimiter Match │
+│  - Multimodal Vision│ │ - Vision Parts   │ │  - Truncation Catch│
 └───────────┬─────────┘ └──────────────────┘ └────────────────────┘
             │
 ┌───────────▼─────────────────────────────────────────────────────┐
-│             Application Interaction Engine                      │
+│             Universal Application Interaction Engine            │
 │             & Application Capability Registry                   │
 ├───────────────┬────────────────┬───────────────┬────────────────┤
 │ BrowserAdapter│   IDEAdapter   │ OfficeAdapter │  CommAdapter   │
-│ (Chrome,Edge, │ (VS Code, Jet- │ (Word, Excel, │ (Slack, Teams, │
-│ Safari, etc.) │  Brains, etc.) │  Docs, Notes) │  Mail, etc.)   │
+│ (Chrome, Safari│ (VS Code, Jet- │ (Word, Excel, │ (Slack, Teams, │
+│  Brave, Tor)  │  Brains, etc.) │  Docs, Notes) │  Terminal)     │
 └───────────────┴────────────────┴───────────────┴────────────────┘
                                 │
 ┌───────────────────────────────▼─────────────────────────────────┐
 │                  Master Recovery Manager                        │
 │   - Error Classification (15 standard error categories)         │
 │   - Bounded Exponential Backoff with Jitter                     │
-│   - Preservation of Completed Work Across Recoveries            │
+│   - State Preservation of Work Across Recoveries                │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## Framework Evaluation: Electron vs Tauri
+## 2. Python Technology Stack
 
-Before development, both Electron and Tauri were comprehensively evaluated against desktop automation requirements:
-
-| Evaluation Criteria | Electron + TypeScript | Tauri (Rust + Webview) | Evaluation Decision |
-|---|---|---|---|
-| **Global Shortcuts** | Native `globalShortcut` with conflict detection and re-registration | Requires external plugins; platform quirks with custom modifiers | **Electron wins** for battle-tested desktop hooks |
-| **Accessibility & Automation** | Seamless access to Node.js child processes (`osascript`, JXA, PowerShell, C#) | Requires writing custom unsafe Rust FFI bindings for macOS Accessibility API | **Electron wins** for rapid, cross-platform OS scripting |
-| **Screen Capture** | Built-in `desktopCapturer` + native screencapture tools | Requires separate platform-specific crates | **Electron wins** |
-| **Clipboard Support** | Built-in multi-format clipboard API (text, RTF, HTML, image) | Basic clipboard plugin | **Electron wins** |
-| **Security & Credential Boundary** | ContextIsolation + Sandbox disables direct renderer access to Node APIs | Strong Rust backend boundary | **Tie** |
-| **Package Maintenance** | Single Node/TypeScript toolchain (`tsc`, `vitest`, `electron`) | Requires both Node.js and Rust (`cargo`, `rustc`, `c++` toolchains) | **Electron wins** for team maintainability |
-
-**Selected Primary Framework:** **Electron + TypeScript** was selected as the optimal production choice for desktop accessibility, input automation, multi-display capture, and clean modular architecture.
-
----
-
-## Global Shortcuts & Activation Model
-
-Support for macOS and Windows is implemented as first-class citizens:
-
-| Platform | Activation Shortcut | Alternative Activation | Answer Delivery Shortcut | Dismiss HUD |
-|---|---|---|---|---|
-| **macOS** | `Command + Shift + Z` | `Alt + Shift + Z` | `Alt + Enter` | `Escape` |
-| **Windows** | `Ctrl + Shift + Z` | `Alt + Shift + Z` | `Alt + Enter` | `Escape` |
-| **Linux** | `Ctrl + Shift + Z` | `Alt + Shift + Z` | `Alt + Enter` | `Escape` |
-
-### Key Requirements Enforced:
-1. **Separation of Actions**: The activation shortcut (`Command/Ctrl + Shift + Z`) and the insertion shortcut (`Alt + Enter`) are strictly separated into two different operations to prevent unintended input insertion.
-2. **Duplicate Event Debounce**: Rapid repeated keystrokes are automatically debounced (400ms window).
-3. **Conflict Detection**: If the OS reports that the primary shortcut is registered by another application, the system automatically falls back to the configured alternative (`Alt + Shift + Z`) and registers an actionable diagnostic warning.
-4. **Tray & Menu-bar Integration**: macOS menu-bar and Windows system tray provide manual activation, HUD toggle, status checks, and quick configuration access.
-
----
-
-## Subsystem Architecture
-
-### 1. Explicit State Machine
-The core engine lifecycle is driven by a finite state machine (`src/main/state/StateMachine.ts`):
-- **States:** `IDLE`, `ACTIVATING`, `CAPTURING`, `CAPTURE_RECOVERY`, `GENERATING`, `GENERATION_RECOVERY`, `VALIDATING`, `READY`, `DELIVERING`, `DELIVERY_RECOVERY`, `COMPLETED`, `PAUSED`, `CANCELLED`, `FAILED`.
-- **Stale Token Rejection:** Each cycle receives a unique UUID task ID. Stale asynchronous callbacks from canceled or previous tasks are rejected immediately.
-- **Work Preservation:** When delivery fails, the state machine retains both the original question and the generated answer, transitioning to `DELIVERY_RECOVERY` to enable instant clipboard fallback without re-invoking the AI model.
-
-### 2. Master Recovery Manager
-Located in `src/main/recovery/RecoveryManager.ts`:
-- Classifies failures into 15 standard error categories:
-  `NETWORK_ERROR`, `TIMEOUT`, `RATE_LIMIT`, `INVALID_CONFIGURATION`, `PERMISSION_DENIED`, `UNSUPPORTED_OPERATION`, `CAPTURE_FAILED`, `OCR_FAILED`, `TARGET_NOT_FOUND`, `FOCUS_CHANGED`, `INVALID_RESPONSE`, `PARTIAL_COMPLETION`, `DUPLICATE_ACTION`, `CANCELLED`, `PERMANENT_FAILURE`.
-- **Side Effect Safety Guard:** Retries are strictly forbidden if partial side effects have occurred (e.g. partial keystroke entry) until verified.
-- **Bounded Backoff:** Exponential backoff with random jitter up to 3 bounded retry attempts.
-- **Ordered Subsystem Fallback Matrices:**
-  - *Capture Sequence:* `Selected Text` → `Accessibility Node` → `App Adapter` → `Clipboard` → `Region OCR` → `Screen OCR` → `Manual Entry`.
-  - *Delivery Sequence:* `App API` → `Editor Integration` → `Accessibility Insertion` → `Keyboard Simulation` → `Clipboard Copy` → `Selectable HUD Window`.
-
-### 3. Application Interaction Engine & Adapters
-Located in `src/main/interaction/ApplicationInteractionEngine.ts`:
-- Features an **Application Capability Registry** tracking supported interaction layers (ranked 1 to 10), available OS permissions, adapter version, health status, and known limitations.
-- Resolves target window identity, process ID, bundle ID, and active application category.
-
-### 4. Question Capture Engine
-Located in `src/main/capture/QuestionCaptureEngine.ts`:
-- Preserves indentation, multiline breaks, and code structure.
-- Redacts sensitive credentials (API keys, authorization headers, passwords, card numbers) before processing.
-- Integrates pluggable OCR (`OcrService`) backed by `tesseract.js` for image-based text recovery.
-- Reversible clipboard capture: copies selection and restores previous clipboard contents if selection was empty.
-
-### 5. Gemini AI Answer Engine
-Located in `src/main/ai/GeminiAnswerEngine.ts`:
-- Powered by official Google Gen AI SDK (`@google/genai`).
-- Default model: `gemini-2.5-flash` (configurable to `gemini-2.5-pro` for deep reasoning, or `gemini-2.0-flash` for rapid fallback).
-- **Intelligent Format Detection:** Automatically identifies whether a question is:
-  - **Coding:** Generates raw, valid, production code without conversational code fences.
-  - **MCQ:** Returns target option letter and answer text.
-  - **SQL:** Returns raw, capitalized SQL query.
-  - **JSON:** Returns strictly valid RFC 8259 JSON.
-  - **Debugging:** Pinpoints root cause and provides direct code fix.
-  - **Clarification:** Asks targeted clarifying question if prompt is ambiguous.
-
-### 6. Answer Validation Engine
-Located in `src/main/validation/AnswerValidationEngine.ts`:
-- Inspects response for empty content, unexpected truncation (unbalanced braces/brackets or dangling operators), JSON parse validity, and required function signatures.
-- Automatically triggers a bounded correction request if validation errors occur, preserving the original answer for user review if correction fails.
-
-### 7. Answer Delivery Engine
-Located in `src/main/delivery/AnswerDeliveryEngine.ts`:
-- Verifies target identity and focus before insertion. If the user switched windows, a `FocusChangedError` is raised.
-- **Safety Rule:** Never auto-submits forms, never auto-sends chat messages, never executes generated code.
-- Automatically prepares clipboard fallback if direct insertion cannot be verified.
-
-### 8. Security, Privacy & Prompt Injection Defense
-Located in `src/main/security/SecurityManager.ts`:
-- Zero hardcoded secrets; API keys stored in-memory, masked as `********` in UI/logs.
-- Regex-based redaction of Google API keys, OpenAI keys, GitHub tokens, Bearer headers, and credit card numbers.
-- **Prompt Injection Defense:** Analyzes captured text for override attacks (e.g. *"ignore previous instructions", "system prompt override"*), flags suspicious payloads, and encapsulates untrusted input within rigid boundaries.
-
----
-
-## Application Coverage Matrix
-
-| Category | Supported Applications | Integration Layer | Safety Guarantees |
-|---|---|---|---|
-| **Browsers** | Google Chrome, Edge, Safari, Firefox, Arc, Brave | AppleScript / JXA / DOM / Clipboard | Never auto-submits forms |
-| **IDEs / Editors** | VS Code, Cursor, JetBrains IDEs, Xcode, Sublime, Terminal | Editor AppleScript / Normalized Keystroke Paste | **Never executes generated code** |
-| **Office & Docs** | Word, Excel, PowerPoint, Pages, Numbers, Notion, Obsidian | Accessibility Node / Clipboard Paste | Prevents cell/document overwrite |
-| **Communication** | Slack, Microsoft Teams, Discord, Apple Mail, Outlook | Accessibility Compose / Clipboard Paste | **Never sends messages automatically** |
-| **Generic Apps** | Legacy software, Custom GUIs, PDF readers | Visual OCR + Clipboard Fallback | User confirmation for insertion |
-
----
-
-## How to Add a New Application Adapter
-
-Adding support for a new application is straightforward:
-
-1. Create a new class extending `BaseAdapter` in `src/main/adapters/`:
-
-```typescript
-import { BaseAdapter, InsertionResult } from './BaseAdapter.js';
-import { TargetApplication, AppCategory } from '../../shared/types.js';
-
-export class FigmaAdapter extends BaseAdapter {
-  public readonly category: AppCategory = 'generic';
-  public readonly name = 'FigmaAdapter';
-  public readonly supportedApplications = ['Figma'];
-
-  public matches(target: TargetApplication): boolean {
-    return target.appName.toLowerCase().includes('figma');
-  }
-
-  public async readSelection(target: TargetApplication): Promise<string | null> {
-    // Custom extraction via Figma plugin API or clipboard
-    return null;
-  }
-
-  public async readContent(target: TargetApplication): Promise<string | null> {
-    return target.windowTitle || null;
-  }
-
-  public async insertText(target: TargetApplication, text: string): Promise<InsertionResult> {
-    const copied = await this.copyToClipboard(text);
-    return {
-      success: copied,
-      verified: true,
-      deliveryMethodUsed: 'clipboard_copy',
-    };
-  }
-}
-```
-
-2. Register the adapter in `src/main/interaction/ApplicationInteractionEngine.ts`:
-```typescript
-this.adapters.unshift(new FigmaAdapter());
-```
-
----
-
-## Getting Started & Installation
-
-### Prerequisites
-- Node.js >= 18.0.0
-- npm >= 9.0.0
-
-### Step 1: Clone or Open Project Directory
-```bash
-cd /Users/ankitkumawat/.gemini/antigravity-ide/scratch/universal-desktop-assistant
-```
-
-### Step 2: Install Dependencies
-```bash
-npm install
-```
-
-### Step 3: Configure Environment (Optional)
-Copy `.env.example` to `.env`:
-```bash
-cp .env.example .env
-```
-Add your Gemini API key (or configure it in the desktop UI Settings panel):
-```env
-GEMINI_API_KEY=AIzaSy...
-```
-
-### Step 4: Build TypeScript Source
-```bash
-npm run build
-```
-
-### Step 5: Launch Application
-```bash
-npm start
-```
-
----
-
-## Operating System Permissions
-
-To enable seamless desktop interaction, grant the following permissions:
-
-### macOS:
-1. **Accessibility Permission:**
-   - Open **System Settings > Privacy & Security > Accessibility**.
-   - Enable your terminal or `OmniAssist`.
-   - *Required for:* Identifying active window, reading selected text, simulating keyboard paste.
-2. **Screen Recording Permission:**
-   - Open **System Settings > Privacy & Security > Screen Recording**.
-   - Enable `OmniAssist`.
-   - *Required for:* Screen-region capture and OCR text reading.
-
-### Windows:
-- Runs in standard user context without requiring Administrator privileges.
-- Windows UI Automation and clipboard access are enabled out of the box.
-
----
-
-## Automated Testing Suite
-
-The application includes unit and integration tests covering all critical failure modes:
-
-```bash
-npm test
-```
-
-### Test Coverage Highlights (43 tests):
-- `tests/StateMachine.test.ts` (7 tests): Lifecycle transitions, stale token rejection, work preservation on recovery.
-- `tests/RecoveryManager.test.ts` (6 tests): Error classification, side effect safety checks, bounded exponential backoff.
-- `tests/SecurityManager.test.ts` (4 tests): Credential masking, log redaction, prompt injection threat detection.
-- `tests/AnswerValidationEngine.test.ts` (7 tests): Truncation detection, syntax checks, JSON validation, signature checks.
-- `tests/GeminiAnswerEngine.test.ts` (4 tests): Question format detection, duplicate rejection, cancellation.
-- `tests/AnswerDeliveryEngine.test.ts` (3 tests): Target focus change detection, duplicate delivery rejection, clipboard fallback.
-- `tests/QuestionCaptureEngine.test.ts` (3 tests): OCR post-processing, manual fallback, error handling.
-- `tests/CapabilityRegistry.test.ts` (3 tests): Target capability mapping, dynamic health probe.
-- `tests/Adapters.test.ts` (5 tests): Category matching across Browsers, IDEs, Office, Communication, Generic.
-- `tests/SmokeIntegration.test.ts` (1 test): End-to-end simulated interaction pipeline from activation to delivery.
-
----
-
-## Packaging & Distribution
-
-OmniAssist is pre-configured with `electron-builder`:
-
-### Build for macOS:
-```bash
-npm run pack:mac
-```
-Generates a signed DMG and `.zip` in the `release/` directory.
-
-### Build for Windows:
-```bash
-npm run pack:win
-```
-Generates an NSIS installer and portable executable in the `release/` directory.
-
----
-
-## Troubleshooting
-
-| Issue | Cause | Solution |
+| Capability | Python Library | Rationale |
 |---|---|---|
-| **Shortcut does not activate** | Another app is using `Command+Shift+Z` / `Ctrl+Shift+Z` | Assistant automatically tries `Alt+Shift+Z`. You can also customize shortcuts in Settings. |
-| **"OS permission is not granted"** | Accessibility or Screen Recording permissions missing | Open OS Privacy & Security settings and grant permission to the app. |
-| **"Gemini returned empty response"** | Network timeout or quota limit | Check internet connection or switch to `gemini-2.0-flash` in Settings. |
-| **"Target focus changed"** | Window switched before insertion completed | Click the "Copy" button in the HUD to paste manually, or refocus the target window. |
-| **Direct insertion blocked in field** | Target application field is read-only or sandboxed | Answer is automatically copied to clipboard. Press Paste (`Cmd/Ctrl+V`) directly. |
+| **Desktop GUI & Tray** | `PySide6` (Qt 6) | Native GPU-accelerated frameless HUD, system tray, cross-platform |
+| **Global Shortcuts** | `pynput` | Cross-platform event tap hooks without blocking GUI event loop |
+| **Input Automation** | `pyautogui` | Controlled cross-platform simulated keystrokes and typing |
+| **Clipboard Service** | `pyperclip` | Safe clipboard access with preservation of prior user clipboard |
+| **Screen Capture** | `mss` + `Pillow` | Fast multi-monitor screen region capture and image preprocessing |
+| **OCR Text Extraction**| `pytesseract` | Local Tesseract OCR with adaptive contrast binarization |
+| **AI Intelligence** | `google-genai` | Official Gemini Python SDK supporting multimodal vision & retries |
+| **Config & Schema** | `pydantic` | Typed configuration serialization and response validation |
+| **Credential Storage** | `keyring` | OS-backed secret storage (macOS Keychain, Windows Credential Vault)|
+| **Testing** | `pytest` + `pytest-mock` | Comprehensive unit and integration test coverage |
+| **Binary Packaging** | `PyInstaller` | Bundling into standalone windowed `.app` and `.exe` executables |
 
 ---
 
-## License
+## 3. Project Directory Structure
 
-Apache-2.0. Built with Google Gemini AI and Electron.
+```text
+universal-desktop-assistant/
+├── main.py                     # Primary executable entry point (GUI & Headless daemon)
+├── requirements.txt            # Pinned Python package dependencies
+├── pyproject.toml              # Modern PEP 621 / 518 packaging configuration
+├── .env.example                # Environment variables template
+├── README.md                   # Complete architectural documentation
+├── config/
+│   ├── __init__.py
+│   └── settings.py             # Pydantic schema and JSON persistence (~/.omniassist/config.json)
+├── app/
+│   ├── __init__.py
+│   ├── application.py          # PySide6 application coordinator & cross-thread signal dispatcher
+│   ├── lifecycle.py            # Global keyboard listener & startup/shutdown hooks
+│   ├── state_machine.py        # Explicit 9-state finite state machine with transitions table
+│   └── task_manager.py         # ThreadPoolExecutor for background non-blocking execution
+├── ui/
+│   ├── __init__.py
+│   ├── main_window.py          # Dark glassmorphic prompt preview and control HUD
+│   ├── answer_window.py        # Validated solution presentation window with copy & insert
+│   ├── settings_window.py      # Modal dialog for API key, model selection, and shortcuts
+│   └── tray_manager.py         # System tray icon and OS menu bar integration
+├── core/
+│   ├── __init__.py
+│   ├── orchestrator.py         # Central workflow pipeline coordinator
+│   ├── capability_registry.py  # Application category capability matrix & permission validator
+│   ├── application_detector.py # Foreground application classification (Browser, IDE, Terminal)
+│   └── recovery_manager.py     # 15 error categories, bounded jittered backoff, state preservation
+├── ai/
+│   ├── __init__.py
+│   ├── provider.py             # Abstract AIProvider interface and dataclasses
+│   ├── gemini_provider.py      # Official google-genai integration with multimodal vision
+│   ├── prompt_builder.py       # Format intent detection & specialized system instructions
+│   └── response_validator.py   # Python AST check, JSON repair, fence stripping, delimiter balance
+├── capture/
+│   ├── __init__.py
+│   ├── question_capture.py     # Multi-tiered capture coordinator (Selection->AX->OCR->Vision)
+│   ├── screen_capture.py       # High-performance mss screen and bounding-box capture
+│   ├── accessibility_capture.py# OS accessibility tree focused control inspection
+│   └── ocr_engine.py           # Preprocessed Tesseract OCR with contrast enhancement
+├── delivery/
+│   ├── __init__.py
+│   ├── answer_delivery.py      # Delivery coordinator managing clipboard and target insertion
+│   ├── clipboard_service.py    # Clipboard manipulation with sentinel verification
+│   └── text_insertion.py       # Verified target focus text injection (preventing self-insertion)
+├── browsers/
+│   ├── __init__.py
+│   ├── base_adapter.py         # Abstract BrowserAdapter specification
+│   ├── browser_detection.py    # Active browser dispatcher
+│   ├── capability_detection.py # Privacy sandbox inspection & capability flags
+│   └── adapters/
+│       ├── __init__.py
+│       ├── generic_adapter.py  # Base reusable browser adapter
+│       ├── chrome_adapter.py   # Google Chrome
+│       ├── safari_adapter.py   # Apple Safari with AppleScript hooks
+│       ├── firefox_adapter.py  # Mozilla Firefox
+│       ├── brave_adapter.py    # Brave Browser with Shields awareness
+│       ├── edge_adapter.py     # Microsoft Edge
+│       ├── tor_adapter.py      # Tor Browser with strict anti-fingerprinting isolation
+│       └── librewolf_adapter.py# LibreWolf privacy fork
+├── platforms/
+│   ├── __init__.py
+│   ├── macos.py                # macOS AppKit, AXIsProcessTrusted, and System Events integration
+│   └── windows.py              # Windows Win32 ctypes window queries and keystrokes
+├── security/
+│   ├── __init__.py
+│   ├── credential_store.py     # OS Keyring credential storage with env fallback & key masking
+│   └── privacy.py              # PII redaction (cards, SSN, tokens) & prompt injection defense
+├── logging_service/
+│   ├── __init__.py
+│   └── logger.py               # Structured logging with secret redaction and rotating file handler
+├── tests/
+│   ├── __init__.py
+│   ├── test_state_machine.py   # FSM lifecycle and illegal transition test cases
+│   ├── test_recovery.py        # 15 error categories and work preservation tests
+│   ├── test_ai_provider.py     # Prompt building, intent detection, and response validator tests
+│   ├── test_capture.py         # ScreenRegion, privacy filter, and capture tests
+│   └── test_delivery.py        # Clipboard and target focus verification tests
+└── packaging/
+    └── build_instructions.md   # PyInstaller packaging instructions for macOS and Windows
+```
+
+---
+
+## 4. Getting Started & Installation
+
+### Step 1: Environment Setup
+
+```bash
+# Clone the repository and enter directory
+cd universal-desktop-assistant
+
+# Create Python virtual environment
+python3 -m venv .venv
+
+# Activate virtual environment
+source .venv/bin/activate       # macOS / Linux
+# On Windows: .venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### Step 2: Configure Gemini Credentials
+
+You can set your Gemini API Key in any of the following ways:
+1. **Via the UI**: Launch the app, open **Settings**, and paste your API key. It will be securely stored in your **OS Keyring** (macOS Keychain or Windows Credential Vault).
+2. **Via Environment Variable**:
+   ```bash
+   cp .env.example .env
+   export GEMINI_API_KEY="your-actual-api-key"
+   ```
+
+### Step 3: Run OmniAssist
+
+```bash
+# Launch full desktop GUI and system tray
+python main.py
+
+# Or launch in headless background daemon mode (useful for servers / terminal environments)
+python main.py --headless
+```
+
+---
+
+## 5. Global Shortcuts & Activation Model
+
+| Action | macOS Shortcut | Windows Shortcut | Function |
+|---|---|---|---|
+| **Activate Assistant** | `Command + Shift + Z` | `Ctrl + Shift + Z` | Captures context from active app and opens HUD |
+| **Deliver Answer** | `Alt + Enter` | `Alt + Enter` | Injects validated answer into target application |
+| **Snip Screen Region** | `Command + Shift + S` | `Ctrl + Shift + S` | Captures screen region for OCR / Vision |
+| **Dismiss / Cancel** | `Escape` | `Escape` | Aborts active background task and hides HUD |
+
+---
+
+## 6. Multi-Tiered Question Capture Cascade
+
+OmniAssist employs a smart, prioritized context capture cascade:
+
+```
+[Trigger Shortcut Pressed]
+          │
+          ▼
+   1. Active Text Selection (Cmd+C / Ctrl+C with clipboard backup)
+          │  (If text selected -> returns immediately)
+          ▼
+   2. OS Accessibility API (Focused control value / text attribute)
+          │  (If accessible text found -> returns immediately)
+          ▼
+   3. Screen Region OCR (Tesseract with adaptive contrast enhancement)
+          │  (If OCR detects text -> returns immediately)
+          ▼
+   4. Multimodal Vision (Full screenshot sent to Gemini Vision)
+          │  (If vision analysis requested)
+          ▼
+   5. Fallback Manual Prompt (Interactive editing in Dark HUD)
+```
+
+---
+
+## 7. Response Validation & Auto-Correction
+
+Before an answer is delivered, it passes through `ResponseValidator`:
+- **Markdown Fence Stripping**: Automatically removes wrapping ```python ... ``` when raw code was requested for direct editor insertion.
+- **Conversational Pleasantry Stripping**: Cleans introductory chatter ("Sure! Here is your code:") to maintain clean paste targets.
+- **Syntax Checking**: Parses Python code through `ast.parse` and JSON through `json.loads`.
+- **Bounded JSON Repair**: Auto-repairs missing trailing brackets or braces caused by token boundaries.
+- **Delimiter Balance Verification**: Ensures matched parentheses, brackets, and quotes.
+
+---
+
+## 8. Master Recovery Manager & Zero Work Loss
+
+If an error occurs at any point in the pipeline:
+1. **15 Standardized Error Classifications**:
+   - `AUTH_FAILED`, `QUOTA_EXCEEDED`, `NETWORK_TIMEOUT`, `NETWORK_UNAVAILABLE`, `MODEL_UNAVAILABLE`, `PROMPT_BLOCKED`, `CAPTURE_EMPTY`, `CAPTURE_PERMISSION_DENIED`, `WINDOW_MISMATCH`, `INSERTION_FAILED`, `SYNTAX_INVALID`, `TRUNCATED_RESPONSE`, `CLIPBOARD_LOCKED`, `SHORTCUT_CONFLICT`, `UNEXPECTED_INTERNAL_ERROR`.
+2. **Exponential Backoff with Jitter**: Automatically retries transient network or quota errors with randomized backoff.
+3. **Preservation of Work**: If insertion fails, the generated answer and captured context are **never discarded**. The answer remains stored and viewable in the HUD, and is automatically copied to the clipboard.
+
+---
+
+## 9. Automated Testing Suite
+
+Run the complete automated test suite with pytest:
+
+```bash
+# Run all unit tests
+pytest -v
+
+# Run specific subsystem tests
+pytest tests/test_state_machine.py -v
+pytest tests/test_ai_provider.py -v
+pytest tests/test_recovery.py -v
+pytest tests/test_capture.py -v
+pytest tests/test_delivery.py -v
+```
+
+---
+
+## 10. Packaging into Standalone Executables
+
+See [packaging/build_instructions.md](packaging/build_instructions.md) for full instructions:
+
+```bash
+# Package as a windowed macOS .app bundle
+pyinstaller --name "OmniAssist" --windowed --noconsole main.py
+
+# Package as a single-file Windows .exe
+pyinstaller --name "OmniAssist" --noconsole --onefile main.py
+```
