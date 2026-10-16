@@ -1,0 +1,27 @@
+project-includes = [
+    ".",
+    "ai",
+    "app",
+    "browsers",
+    "capture",
+    "config",
+    "core",
+    "delivery",
+    "logging_service",
+    "platforms",
+    "security",
+    "ui",
+    "tests",
+]
+project-excludes = [
+    "**/node_modules",
+    "**/.venv",
+    "**/dist",
+]
+search-path = ["."]
+disable-search-path-heuristics = true
+enable-fallback-search-path = true
+infer-with-first-use = false
+
+[errors]
+missing-import = "ignore"

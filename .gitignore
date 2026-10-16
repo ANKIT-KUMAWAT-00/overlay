@@ -30,3 +30,14 @@ Thumbs.db
 # Test coverage
 coverage/
 .nyc_output/
+.pytest_cache/
+
+# Python Virtual Environments & Bytecode
+.venv/
+venv/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+*.spec
+.omniassist/

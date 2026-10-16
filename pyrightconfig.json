@@ -1,0 +1,29 @@
+{
+  "include": [
+    ".",
+    "ai",
+    "app",
+    "browsers",
+    "capture",
+    "config",
+    "core",
+    "delivery",
+    "logging_service",
+    "platforms",
+    "security",
+    "ui",
+    "tests"
+  ],
+  "exclude": [
+    "**/node_modules",
+    "**/.venv",
+    "**/dist"
+  ],
+  "extraPaths": [
+    "."
+  ],
+  "venvPath": ".",
+  "venv": ".venv",
+  "reportMissingImports": "none",
+  "reportUnusedImport": "none"
+}
