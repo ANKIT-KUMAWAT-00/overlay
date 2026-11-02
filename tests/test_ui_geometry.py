@@ -55,3 +55,4 @@ def test_snipping_overlay_init():
     """Verify SnippingOverlay creates with correct flags."""
     overlay = SnippingOverlay()
     assert overlay.cursor().shape() is not None
+
