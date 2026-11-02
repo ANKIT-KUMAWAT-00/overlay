@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 from config.settings import AppSettings, get_settings
 from security.credential_store import CredentialStore
 from ai.gemini_provider import GeminiProvider
+from platforms import exclude_window_from_screen_capture
 from logging_service.logger import get_logger
 
 logger = get_logger("ui.settings_window")
@@ -237,6 +238,10 @@ class SettingsWindow(QDialog):
         # Delivery
         self.chk_auto_copy.setChecked(self.settings.delivery.auto_copy_to_clipboard)
         self.chk_auto_insert.setChecked(self.settings.delivery.auto_insert_to_active_app)
+
+    def showEvent(self, event) -> None:
+        super().showEvent(event)
+        exclude_window_from_screen_capture(self)
 
     def _test_connection(self) -> None:
         key = self.edit_api_key.text().strip()
