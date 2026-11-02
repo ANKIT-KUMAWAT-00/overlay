@@ -18,11 +18,47 @@ def test_ai_error_model():
 def test_prompt_builder_intent_detection():
     pb = PromptBuilder()
 
-    assert pb.detect_format_intent("Write a Python function to sort an array") == OutputFormat.CODE
+    assert pb.detect_format_intent("Write a function to sort an array") == OutputFormat.CODE
+    assert pb.detect_format_intent("Write a Python function to sort an array") in (OutputFormat.CODE, OutputFormat.CODE_PYTHON)
+    assert pb.detect_format_intent("Write a C++ solution using std::vector") in (OutputFormat.CODE, OutputFormat.CODE_CPP)
     assert pb.detect_format_intent("Which of the following is correct: (A) or (B)?") == OutputFormat.MULTIPLE_CHOICE
     assert pb.detect_format_intent("Return the user profile as a json schema") == OutputFormat.JSON
     assert pb.detect_format_intent("What is the capital of France in one sentence?") == OutputFormat.SHORT_ANSWER
     assert pb.detect_format_intent("Explain quantum entanglement in depth") == OutputFormat.THEORY
+
+
+def test_prompt_builder_cpp_system_instruction():
+    pb = PromptBuilder()
+    sys_cpp = pb.build_system_instruction(OutputFormat.CODE_CPP, target_app="CLion")
+    assert "C++" in sys_cpp
+    assert "CLion" in sys_cpp
+    assert "headers" in sys_cpp.lower()
+
+
+def test_response_validator_cpp_code_does_not_fail_ast():
+    validator = ResponseValidator()
+    cpp_code = (
+        "#include <iostream>\n"
+        "#include <vector>\n"
+        "using namespace std;\n\n"
+        "class Solution {\n"
+        "public:\n"
+        "    int maxSubArray(vector<int>& nums) {\n"
+        "        int maxSum = nums[0];\n"
+        "        int curSum = 0;\n"
+        "        for (int x : nums) {\n"
+        "            curSum = max(x, curSum + x);\n"
+        "            maxSum = max(maxSum, curSum);\n"
+        "        }\n"
+        "        return maxSum;\n"
+        "    }\n"
+        "};"
+    )
+    result = validator.validate(cpp_code, expected_format=OutputFormat.CODE)
+    assert result.is_valid
+    # Make sure it did NOT add a Python AST error notice
+    assert not any("Python AST check notice" in w for w in result.warnings)
+
 
 
 def test_prompt_builder_system_instruction():
