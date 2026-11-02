@@ -63,6 +63,7 @@ class AISettings(BaseModel):
     max_output_tokens: int = Field(default=4096, ge=128, le=32768)
     timeout_seconds: float = Field(default=30.0, ge=5.0, le=300.0)
     max_retries: int = Field(default=3, ge=0, le=10)
+    ssl_verify: bool = Field(default=True, description="Verify SSL certificates for API requests")
     system_instruction: str = Field(
         default=(
             "You are OmniAssist, a precise, expert AI desktop assistant. "

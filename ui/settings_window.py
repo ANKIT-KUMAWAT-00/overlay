@@ -179,6 +179,9 @@ class SettingsWindow(QDialog):
         model_row.addStretch()
         api_layout.addLayout(model_row)
 
+        self.chk_ssl_verify = QCheckBox("Verify SSL Certificates (uncheck if using corporate VPN/proxy)")
+        api_layout.addWidget(self.chk_ssl_verify)
+
         layout.addWidget(grp_api)
 
         # 2. Global Shortcuts Group
@@ -240,6 +243,8 @@ class SettingsWindow(QDialog):
             self.combo_model.addItem(self.settings.ai.model_name)
             self.combo_model.setCurrentText(self.settings.ai.model_name)
 
+        self.chk_ssl_verify.setChecked(self.settings.ai.ssl_verify)
+
         # Shortcuts
         self.edit_sc_activate.setText(self.settings.shortcuts.activation_shortcut)
         self.edit_sc_deliver.setText(self.settings.shortcuts.delivery_shortcut)
@@ -258,7 +263,11 @@ class SettingsWindow(QDialog):
             QMessageBox.warning(self, "API Test", "Please enter a Gemini API Key to test.")
             return
 
-        provider = GeminiProvider(api_key=key, model_name=self.combo_model.currentText())
+        provider = GeminiProvider(
+            api_key=key,
+            model_name=self.combo_model.currentText(),
+            ssl_verify=self.chk_ssl_verify.isChecked(),
+        )
         ok = provider.health_check()
         if ok:
             QMessageBox.information(self, "API Test", "✓ Gemini API connection test succeeded!")
@@ -271,6 +280,7 @@ class SettingsWindow(QDialog):
             self.cred_store.store_api_key(key)
 
         self.settings.ai.model_name = self.combo_model.currentText()
+        self.settings.ai.ssl_verify = self.chk_ssl_verify.isChecked()
         self.settings.shortcuts.activation_shortcut = self.edit_sc_activate.text().strip()
         self.settings.shortcuts.delivery_shortcut = self.edit_sc_deliver.text().strip()
         self.settings.delivery.auto_copy_to_clipboard = self.chk_auto_copy.isChecked()
