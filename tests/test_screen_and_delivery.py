@@ -91,3 +91,35 @@ def test_force_insert_delivery_pastes_into_target():
     assert result.success
     assert result.inserted_to_app
     mock_platform.insert_text.assert_called_once()
+
+
+def test_question_capture_invokes_pre_capture_hook():
+    """Verify pre_capture_hook is invoked before screen capture to ensure windows are hidden."""
+    mock_platform = MagicMock()
+    mock_platform.get_active_app_info.return_value = {"app_name": "Terminal", "window_title": "zsh"}
+    mock_platform.get_selected_text_via_clipboard.return_value = None
+
+    mock_screen = MagicMock()
+    mock_screen.capture_fullscreen.return_value = MagicMock()
+    mock_screen.image_to_bytes.return_value = b"testbytes"
+
+    mock_acc = MagicMock()
+    mock_acc.capture_focused_text.return_value = (None, "AXUnknown")
+
+    hook_called = False
+
+    def hook():
+        nonlocal hook_called
+        hook_called = True
+
+    service = QuestionCaptureService(
+        screen_capture=mock_screen,
+        accessibility=mock_acc,
+        pre_capture_hook=hook,
+    )
+    service.platform = mock_platform
+
+    service.capture(method=CaptureMethod.FULLSCREEN_VISION, include_vision=True)
+    assert hook_called is True
+    mock_screen.capture_fullscreen.assert_called_once()
+
