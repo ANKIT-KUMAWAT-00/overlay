@@ -52,10 +52,35 @@ class RedactingFilter(logging.Filter):
 
 def get_default_log_dir() -> Path:
     """Returns the user-local log directory for the assistant."""
+    custom_dir = os.environ.get("OMNIASSIST_LOG_DIR")
+    if custom_dir:
+        target = Path(custom_dir)
+        try:
+            target.mkdir(parents=True, exist_ok=True)
+            return target
+        except OSError:
+            pass
+
     home = Path.home()
     log_dir = home / ".omniassist" / "logs"
-    log_dir.mkdir(parents=True, exist_ok=True)
-    return log_dir
+    try:
+        log_dir.mkdir(parents=True, exist_ok=True)
+        test_file = log_dir / ".perm_check"
+        test_file.touch()
+        test_file.unlink()
+        return log_dir
+    except (OSError, PermissionError):
+        pass
+
+    fallback = Path.cwd() / ".omniassist" / "logs"
+    try:
+        fallback.mkdir(parents=True, exist_ok=True)
+        return fallback
+    except (OSError, PermissionError):
+        import tempfile
+        tmp = Path(tempfile.gettempdir()) / "omniassist" / "logs"
+        tmp.mkdir(parents=True, exist_ok=True)
+        return tmp
 
 
 _LOGGING_CONFIGURED = False
@@ -94,18 +119,21 @@ def configure_logging(
 
     # File Handler
     if log_to_file:
-        target_dir = log_dir or get_default_log_dir()
-        log_file = target_dir / "assistant.log"
-        file_handler = RotatingFileHandler(
-            filename=str(log_file),
-            maxBytes=max_bytes,
-            backupCount=backup_count,
-            encoding="utf-8",
-        )
-        file_handler.setLevel(level)
-        file_handler.setFormatter(formatter)
-        file_handler.addFilter(redacting_filter)
-        root_logger.addHandler(file_handler)
+        try:
+            target_dir = log_dir or get_default_log_dir()
+            log_file = target_dir / "assistant.log"
+            file_handler = RotatingFileHandler(
+                filename=str(log_file),
+                maxBytes=max_bytes,
+                backupCount=backup_count,
+                encoding="utf-8",
+            )
+            file_handler.setLevel(level)
+            file_handler.setFormatter(formatter)
+            file_handler.addFilter(redacting_filter)
+            root_logger.addHandler(file_handler)
+        except (OSError, PermissionError) as exc:
+            root_logger.warning("Could not initialize file logging at %s: %s", target_dir if 'target_dir' in locals() else 'unknown', exc)
 
     _LOGGING_CONFIGURED = True
 
