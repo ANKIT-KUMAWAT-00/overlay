@@ -168,7 +168,13 @@ class SettingsWindow(QDialog):
         model_row = QHBoxLayout()
         model_row.addWidget(QLabel("Default Model:"))
         self.combo_model = QComboBox()
-        self.combo_model.addItems(["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"])
+        self.combo_model.addItems([
+            "gemini-3-flash-preview",
+            "gemini-2.5-flash",
+            "gemini-2.5-pro",
+            "gemini-2.0-flash",
+            "gemini-1.5-flash",
+        ])
         model_row.addWidget(self.combo_model)
         model_row.addStretch()
         api_layout.addLayout(model_row)
@@ -230,6 +236,9 @@ class SettingsWindow(QDialog):
         idx = self.combo_model.findText(self.settings.ai.model_name)
         if idx >= 0:
             self.combo_model.setCurrentIndex(idx)
+        elif self.settings.ai.model_name:
+            self.combo_model.addItem(self.settings.ai.model_name)
+            self.combo_model.setCurrentText(self.settings.ai.model_name)
 
         # Shortcuts
         self.edit_sc_activate.setText(self.settings.shortcuts.activation_shortcut)
