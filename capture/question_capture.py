@@ -55,11 +55,13 @@ class QuestionCaptureService:
         screen_capture: Optional[ScreenCaptureService] = None,
         ocr_engine: Optional[OCREngine] = None,
         accessibility: Optional[AccessibilityCaptureService] = None,
+        pre_capture_hook: Optional[Callable[[], None]] = None,
     ) -> None:
         self.screen_capture = screen_capture or ScreenCaptureService()
         self.ocr_engine = ocr_engine or OCREngine()
         self.accessibility = accessibility or AccessibilityCaptureService()
         self.platform = get_platform_service()
+        self.pre_capture_hook = pre_capture_hook
 
     def capture(
         self,
@@ -108,6 +110,12 @@ class QuestionCaptureService:
         # 3. OCR on screen region or active window
         if method in (CaptureMethod.OCR_REGION, CaptureMethod.SMART) and region:
             try:
+                if self.pre_capture_hook:
+                    try:
+                        self.pre_capture_hook()
+                    except Exception as hook_err:
+                        logger.warning("pre_capture_hook notice: %s", hook_err)
+
                 img = self.screen_capture.capture_region(region)
                 ocr_res = self.ocr_engine.extract_text(img)
                 img_bytes = self.screen_capture.image_to_bytes(img) if include_vision else None
@@ -132,11 +140,24 @@ class QuestionCaptureService:
         # 4. Multimodal Vision Fallback (Captures screen photo when no text selected)
         if method in (CaptureMethod.FULLSCREEN_VISION, CaptureMethod.SMART) and (include_vision or method == CaptureMethod.FULLSCREEN_VISION):
             try:
+                if self.pre_capture_hook:
+                    try:
+                        self.pre_capture_hook()
+                    except Exception as hook_err:
+                        logger.warning("pre_capture_hook notice: %s", hook_err)
+
                 screenshot = self.screen_capture.capture_fullscreen()
                 img_bytes = self.screen_capture.image_to_bytes(screenshot, format="JPEG", quality=80)
                 logger.info("Captured fullscreen image for Gemini Vision analysis (%d bytes)", len(img_bytes))
                 return CapturedQuestion(
-                    text="Carefully read and analyze the screen. If this is a coding problem or task, output ONLY the complete, working code solution ready to be executed (omit problem analysis, explanation essays, and complexity analysis). If it is a multiple choice or other task, give the exact direct answer.",
+                    text=(
+                        "Carefully read and analyze the screen. If this is a coding problem or task: detect the "
+                        "intended programming language from the question, code editor stub, or instructions "
+                        "(e.g. C++, Java, Python, JavaScript, Go, etc. - especially check if C++ / cpp is requested "
+                        "or provided in the starter template), and output ONLY the complete, working code solution "
+                        "in that exact language ready to be executed/compiled (omit problem analysis, explanation essays, "
+                        "and complexity analysis). If it is a multiple choice or other task, give the exact direct answer."
+                    ),
                     method=CaptureMethod.FULLSCREEN_VISION,
                     source_app=source_app,
                     window_title=window_title,
