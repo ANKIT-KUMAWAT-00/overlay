@@ -48,6 +48,27 @@ class MacOSPlatform:
         res = subprocess.run(["osascript", "-e", script], capture_output=True, text=True)
         return res.returncode == 0
 
+    def exclude_window_from_screen_capture(self, qwidget: Any) -> bool:
+        """
+        Natively excludes a PySide6 window from all screen recordings and screenshots
+        using macOS AppKit NSWindowSharingNone.
+        """
+        try:
+            import AppKit
+            import objc
+            from ctypes import c_void_p
+
+            win_id = int(qwidget.winId())
+            ns_view = objc.objc_object(c_void_p=win_id)
+            ns_window = ns_view.window()
+            if ns_window:
+                ns_window.setSharingType_(AppKit.NSWindowSharingNone)
+                logger.info("Successfully applied NSWindowSharingNone to window %s", qwidget)
+                return True
+        except Exception as exc:
+            logger.debug("Failed to set NSWindowSharingNone: %s", exc)
+        return False
+
     def get_active_app_info(self) -> Dict[str, Any]:
         """
         Retrieves active frontmost application name, bundle ID, and window title.
