@@ -17,10 +17,12 @@ from capture.question_capture import CapturedQuestion, CaptureMethod
 from delivery.answer_delivery import DeliveryResult
 from ai.response_validator import ValidationResult
 from core.recovery_manager import RecoveryPlan
+from capture.screen_capture import ScreenRegion
 from ui.tray_manager import TrayManager
 from ui.main_window import MainWindow
 from ui.answer_window import AnswerWindow
 from ui.settings_window import SettingsWindow
+from ui.snipping_overlay import SnippingOverlay
 from logging_service.logger import get_logger
 
 logger = get_logger("app.application")
@@ -63,6 +65,10 @@ class OmniAssistantApplication(QObject):
         self.main_window = MainWindow()
         self.answer_window = AnswerWindow()
         self.settings_window = SettingsWindow()
+        self.snipping_overlay = SnippingOverlay()
+
+        # Ensure assistant windows are always hidden before any screen capture
+        self.orchestrator.capture_service.pre_capture_hook = self._hide_all_windows
 
         # Wire subsystems
         self._wire_signals()
@@ -80,16 +86,20 @@ class OmniAssistantApplication(QObject):
         # Tray signals
         self.tray_manager.activate_requested.connect(self.trigger_activation)
         self.tray_manager.open_hud_requested.connect(self.open_hud)
-        self.tray_manager.capture_region_requested.connect(self.trigger_screen_capture)
+        self.tray_manager.capture_region_requested.connect(self.trigger_region_snip)
         self.tray_manager.settings_requested.connect(self.open_settings)
         self.tray_manager.quit_requested.connect(self.quit_application)
 
         # Main HUD signals
         self.main_window.generate_requested.connect(self._on_generate_requested)
         self.main_window.capture_screen_requested.connect(self.trigger_screen_capture)
-        self.main_window.capture_region_requested.connect(self.trigger_screen_capture)
+        self.main_window.capture_region_requested.connect(self.trigger_region_snip)
         self.main_window.settings_requested.connect(self.open_settings)
         self.main_window.dismiss_requested.connect(self._on_hud_dismissed)
+
+        # Snipping Overlay signals
+        self.snipping_overlay.region_selected.connect(self._on_region_selected)
+        self.snipping_overlay.cancelled.connect(self._on_snip_cancelled)
 
         # Answer Window signals
         self.answer_window.copy_requested.connect(self._on_copy_requested)
@@ -122,13 +132,16 @@ class OmniAssistantApplication(QObject):
         self.lifecycle.shortcuts.on_cancel = lambda: self.sig_hotkey_cancel.emit()
 
     def start(self) -> None:
-        """Starts background lifecycle, shows system tray, and presents HUD."""
+        """Starts background lifecycle and presents tray icon without obstructing the workspace."""
         logger.info("Starting OmniAssist Application...")
         self.lifecycle.startup()
         if self.settings.ui.show_tray_icon:
             self.tray_manager.show()
+            self.tray_manager.show_message(
+                "OmniAssist AI Ready",
+                "Listening for shortcuts. Press ⌘+Shift+Z to activate or ⌘+Shift+S to capture screen.",
+            )
         self.main_window.set_status("READY")
-        self.main_window.show_hud()
 
     def quit_application(self) -> None:
         """Shuts down all threads, shortcuts, and terminates application cleanly."""
@@ -138,26 +151,59 @@ class OmniAssistantApplication(QObject):
         self.qapp.quit()
 
     @Slot()
+    def _hide_all_windows(self) -> bool:
+        """
+        Hides all assistant windows and flushes the Qt event queue.
+        Ensures none of OmniAssist's UI elements appear in screen captures.
+        """
+        had_visible = False
+        windows_to_check = [
+            getattr(self, "main_window", None),
+            getattr(self, "answer_window", None),
+            getattr(self, "settings_window", None),
+            getattr(self, "snipping_overlay", None),
+        ]
+        try:
+            for widget in self.qapp.topLevelWidgets():
+                if widget not in windows_to_check:
+                    windows_to_check.append(widget)
+        except Exception:
+            pass
+
+        for win in windows_to_check:
+            if win is not None and hasattr(win, "isVisible") and win.isVisible():
+                had_visible = True
+                win.hide()
+
+        # Flush Qt event queue so the native window server orders out immediately
+        self.qapp.processEvents()
+        return had_visible
+
+    @Slot()
     def trigger_activation(self) -> None:
         """Triggered via global shortcut: captures context, scans screen if needed, and queries Gemini."""
-        import time
         logger.info("Global activation triggered on MainThread.")
         try:
             self.state_machine.transition_to(AssistantState.ACTIVATING)
         except Exception:
             pass
 
-        # 1. Detect target active app BEFORE showing HUD so target app is remembered accurately
+        # 1. Detect target active app BEFORE hiding windows so target app is remembered accurately
         app_info = self.orchestrator.app_detector.detect_active_application()
         target_name = app_info.name or "Active Application"
         self.main_window.set_target_app(target_name)
         self.answer_window.target_app_name = target_name
 
-        # 2. Hide HUD if already visible so screenshot captures background screen cleanly
-        if self.main_window.isVisible():
-            self.main_window.hide()
-            time.sleep(0.08)
+        # 2. Hide ALL assistant windows so they never appear in screenshots
+        had_visible = self._hide_all_windows()
 
+        if had_visible:
+            # Allow OS compositor 150ms to composite the screen without assistant windows
+            QTimer.singleShot(150, self._perform_context_capture)
+        else:
+            self._perform_context_capture()
+
+    def _perform_context_capture(self) -> None:
         # 3. Capture context: tries Selection -> Accessibility -> Fullscreen Vision
         try:
             captured = self.orchestrator.capture_service.capture(
@@ -216,18 +262,79 @@ class OmniAssistantApplication(QObject):
 
     @Slot()
     def trigger_screen_capture(self) -> None:
-        """Hides HUD, captures screen photo, and sends to Gemini Vision."""
-        self.main_window.hide_hud()
-        QTimer.singleShot(150, self._run_screen_vision)
+        """Hides all assistant windows, captures full screen, and sends to Gemini Vision."""
+        logger.info("Fullscreen screen capture requested.")
+        self._hide_all_windows()
+        # 150ms delay for OS compositor to clear all assistant window surfaces
+        QTimer.singleShot(150, self._capture_and_run_fullscreen)
 
-    def _run_screen_vision(self) -> None:
+    def _capture_and_run_fullscreen(self) -> None:
+        try:
+            screenshot = self.orchestrator.capture_service.screen_capture.capture_fullscreen()
+            img_bytes = self.orchestrator.capture_service.screen_capture.image_to_bytes(
+                screenshot, format="JPEG", quality=80
+            )
+        except Exception as exc:
+            logger.error("Fullscreen capture failed: %s", exc)
+            img_bytes = None
+
+        # Display HUD only AFTER screenshot has been captured cleanly
         self.main_window.set_status("SCANNING")
         self.main_window.set_prompt_text("📷 Screen captured. Scanning question & generating answer via Gemini...")
         self.main_window.show_hud()
+
+        fmt = self.main_window.get_selected_format()
         self.orchestrator.run_interaction_async(
             method=CaptureMethod.FULLSCREEN_VISION,
+            format_preference=fmt,
             include_vision=True,
+            image_bytes=img_bytes,
+            image_mime_type="image/jpeg",
         )
+
+    @Slot()
+    def trigger_region_snip(self) -> None:
+        """Hides assistant windows and initiates interactive region snipping overlay."""
+        logger.info("Region snip requested.")
+        self._hide_all_windows()
+        QTimer.singleShot(120, self.snipping_overlay.start_selection)
+
+    @Slot(object)
+    def _on_region_selected(self, region: ScreenRegion) -> None:
+        """Handles user selecting a region in the snipping overlay."""
+        # 120ms delay allows window manager to remove overlay before region capture
+        QTimer.singleShot(120, lambda: self._capture_and_run_region(region))
+
+    def _capture_and_run_region(self, region: ScreenRegion) -> None:
+        try:
+            img = self.orchestrator.capture_service.screen_capture.capture_region(region)
+            img_bytes = self.orchestrator.capture_service.screen_capture.image_to_bytes(
+                img, format="JPEG", quality=80
+            )
+        except Exception as exc:
+            logger.error("Region capture error: %s", exc)
+            img_bytes = None
+
+        # Present HUD with scanning feedback after capture
+        self.main_window.set_status("SCANNING")
+        self.main_window.set_prompt_text(f"✂ Region captured ({region.width}×{region.height} px). Scanning question & generating answer via Gemini...")
+        self.main_window.show_hud()
+
+        fmt = self.main_window.get_selected_format()
+        self.orchestrator.run_interaction_async(
+            method=CaptureMethod.FULLSCREEN_VISION,
+            region=region,
+            format_preference=fmt,
+            include_vision=True,
+            image_bytes=img_bytes,
+            image_mime_type="image/jpeg",
+        )
+
+    @Slot()
+    def _on_snip_cancelled(self) -> None:
+        """Restores HUD when region snip is dismissed without selecting."""
+        logger.info("Region snip cancelled.")
+        self.main_window.show_hud()
 
     @Slot(str, str)
     def _on_generate_requested(self, prompt: str, format_mode: str) -> None:
@@ -262,6 +369,8 @@ class OmniAssistantApplication(QObject):
     def _on_cancel_hotkey(self) -> None:
         """Global shortcut to cancel active task / dismiss windows."""
         self.orchestrator.cancel()
+        if hasattr(self, "snipping_overlay"):
+            self.snipping_overlay.hide()
         self.main_window.hide_hud()
         self.answer_window.hide_window()
         self.state_machine.reset_to_idle()
