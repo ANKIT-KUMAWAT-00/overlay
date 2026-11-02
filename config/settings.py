@@ -15,7 +15,31 @@ from logging_service.logger import get_logger
 
 logger = get_logger("config.settings")
 
-DEFAULT_CONFIG_PATH = Path.home() / ".omniassist" / "config.json"
+
+def get_default_config_path() -> Path:
+    """Returns default configuration path with permission fallback."""
+    custom = os.environ.get("OMNIASSIST_CONFIG_PATH")
+    if custom:
+        return Path(custom)
+    preferred = Path.home() / ".omniassist" / "config.json"
+    try:
+        preferred.parent.mkdir(parents=True, exist_ok=True)
+        test_file = preferred.parent / ".perm_check"
+        test_file.touch()
+        test_file.unlink()
+        return preferred
+    except (OSError, PermissionError):
+        pass
+    fallback = Path.cwd() / ".omniassist" / "config.json"
+    try:
+        fallback.parent.mkdir(parents=True, exist_ok=True)
+        return fallback
+    except (OSError, PermissionError):
+        import tempfile
+        return Path(tempfile.gettempdir()) / "omniassist" / "config.json"
+
+
+DEFAULT_CONFIG_PATH = get_default_config_path()
 
 
 def get_default_activation_shortcut() -> str:
@@ -80,8 +104,8 @@ class UISettings(BaseModel):
     theme: str = Field(default="dark", description="'dark', 'light', 'system'")
     window_opacity: float = Field(default=0.96, ge=0.5, le=1.0)
     always_on_top: bool = True
-    hud_width: int = 700
-    hud_height: int = 520
+    hud_width: int = 520
+    hud_height: int = 220
     show_tray_icon: bool = True
     launch_at_startup: bool = False
 
