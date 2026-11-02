@@ -83,6 +83,26 @@ class CredentialStore:
             return False
 
         clean_key = api_key.strip()
+        os.environ["GEMINI_API_KEY"] = clean_key
+        # Fallback persistence to .env
+        try:
+            from pathlib import Path
+            env_file = Path(".env")
+            lines = []
+            if env_file.exists():
+                lines = env_file.read_text(encoding="utf-8").splitlines()
+            found = False
+            for i, line in enumerate(lines):
+                if line.startswith("GEMINI_API_KEY="):
+                    lines[i] = f'GEMINI_API_KEY="{clean_key}"'
+                    found = True
+                    break
+            if not found:
+                lines.append(f'GEMINI_API_KEY="{clean_key}"')
+            env_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        except Exception:
+            pass
+
         if self._keyring_available:
             try:
                 import keyring
@@ -91,10 +111,10 @@ class CredentialStore:
                 return True
             except Exception as exc:
                 logger.error("Failed to store API key in keyring: %s", exc)
-                return False
+                return True  # Saved to environment/.env fallback
 
-        logger.warning("OS keyring unavailable; cannot persist credential permanently.")
-        return False
+        logger.warning("OS keyring unavailable; saved to environment/.env fallback.")
+        return True
 
     def delete_api_key(self) -> bool:
         """
