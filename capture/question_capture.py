@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Callable
 
 from capture.screen_capture import ScreenCaptureService, ScreenRegion
 from capture.ocr_engine import OCREngine, OCRResult
@@ -110,7 +110,7 @@ class QuestionCaptureService:
         # 3. OCR on screen region or active window
         if method in (CaptureMethod.OCR_REGION, CaptureMethod.SMART) and region:
             try:
-                if self.pre_capture_hook:
+                if self.pre_capture_hook and callable(self.pre_capture_hook):
                     try:
                         self.pre_capture_hook()
                     except Exception as hook_err:
@@ -140,7 +140,7 @@ class QuestionCaptureService:
         # 4. Multimodal Vision Fallback (Captures screen photo when no text selected)
         if method in (CaptureMethod.FULLSCREEN_VISION, CaptureMethod.SMART) and (include_vision or method == CaptureMethod.FULLSCREEN_VISION):
             try:
-                if self.pre_capture_hook:
+                if self.pre_capture_hook and callable(self.pre_capture_hook):
                     try:
                         self.pre_capture_hook()
                     except Exception as hook_err:
