@@ -418,6 +418,8 @@ class OmniAssistantApplication(QObject):
         self.lifecycle.shortcuts.stop()
         self.lifecycle.shortcuts.start()
         self.orchestrator.ai_provider.set_model(new_settings.ai.model_name)
+        if hasattr(self.orchestrator.ai_provider, "set_ssl_verify"):
+            self.orchestrator.ai_provider.set_ssl_verify(new_settings.ai.ssl_verify)
         logger.info("Applied new user settings.")
 
     # Cross-thread Slot Handlers

@@ -5,6 +5,7 @@ Implements bounded retries, rate-limit recovery, and multimodal vision inputs.
 
 from __future__ import annotations
 
+import os
 import random
 import time
 from typing import Optional
@@ -30,6 +31,7 @@ class GeminiProvider(AIProvider):
         max_output_tokens: int = 4096,
         timeout_seconds: float = 30.0,
         max_retries: int = 3,
+        ssl_verify: bool = True,
         credential_store: Optional[CredentialStore] = None,
         prompt_builder: Optional[PromptBuilder] = None,
     ) -> None:
@@ -38,6 +40,7 @@ class GeminiProvider(AIProvider):
         self.max_output_tokens = max_output_tokens
         self.timeout_seconds = timeout_seconds
         self.max_retries = max_retries
+        self.ssl_verify = ssl_verify
 
         self.cred_store = credential_store or CredentialStore()
         self.prompt_builder = prompt_builder or PromptBuilder()
@@ -46,16 +49,37 @@ class GeminiProvider(AIProvider):
         self._client = None
         self._initialize_client()
 
-    def _initialize_client(self) -> None:
+    def _initialize_client(self, ssl_verify: Optional[bool] = None) -> None:
         """Initializes google.genai.Client if key is available."""
+        if ssl_verify is not None:
+            self.ssl_verify = ssl_verify
+
         if not self._api_key:
             self._api_key = self.cred_store.get_api_key()
 
         if self._api_key:
             try:
                 from google import genai
-                self._client = genai.Client(api_key=self._api_key)
-                logger.info("Initialized Gemini Client with model %s", self._model_name)
+                from google.genai import types
+
+                env_verify = os.environ.get("OMNIASSIST_SSL_VERIFY")
+                effective_verify = self.ssl_verify if env_verify is None else env_verify.lower() not in ("0", "false", "no")
+
+                http_options = None
+                if not effective_verify:
+                    try:
+                        import urllib3
+                        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+                    except Exception:
+                        pass
+                    http_options = types.HttpOptions(client_args={"verify": False})
+
+                self._client = genai.Client(api_key=self._api_key, http_options=http_options)
+                logger.info(
+                    "Initialized Gemini Client with model %s (ssl_verify=%s)",
+                    self._model_name,
+                    effective_verify,
+                )
             except Exception as exc:
                 logger.error("Failed to initialize google-genai client: %s", exc)
                 self._client = None
@@ -76,6 +100,11 @@ class GeminiProvider(AIProvider):
         self._model_name = model_name
         logger.info("Switched active Gemini model to %s", model_name)
 
+    def set_ssl_verify(self, ssl_verify: bool) -> None:
+        """Updates SSL verification policy and reinitializes client."""
+        self.ssl_verify = ssl_verify
+        self._initialize_client(ssl_verify=ssl_verify)
+
     def health_check(self) -> bool:
         """Quick connectivity probe."""
         if not self._api_key or not self._client:
@@ -93,6 +122,18 @@ class GeminiProvider(AIProvider):
             )
             return bool(resp and resp.text)
         except Exception as exc:
+            if ("certificate verify failed" in str(exc).lower() or "ssl" in str(exc).lower()) and self.ssl_verify:
+                logger.warning("Health check SSL verification failed. Retrying with relaxed SSL...")
+                self._initialize_client(ssl_verify=False)
+                try:
+                    resp = self._client.models.generate_content(
+                        model=self._model_name,
+                        contents="ping",
+                        config=config,
+                    )
+                    return bool(resp and resp.text)
+                except Exception:
+                    pass
             logger.warning("Gemini health check probe failed: %s", exc)
             return False
 
@@ -199,6 +240,15 @@ class GeminiProvider(AIProvider):
                     ai_err.message,
                 )
 
+                # Automatic recovery for self-signed certificates / corporate proxies
+                if ("certificate verify failed" in str(exc).lower() or "ssl" in str(exc).lower()) and self.ssl_verify:
+                    logger.warning(
+                        "SSL certificate verification failed (self-signed cert or proxy detected). "
+                        "Automatically falling back to relaxed SSL verification..."
+                    )
+                    self.set_ssl_verify(False)
+                    continue
+
                 if not ai_err.retryable or attempt >= self.max_retries:
                     raise ai_err
 
@@ -249,6 +299,14 @@ class GeminiProvider(AIProvider):
                 category="network",
                 retryable=True,
                 status_code=500,
+            )
+
+        # SSL / Certificate errors (corporate proxy, VPN, inspection)
+        if "certificate verify failed" in lowered or "ssl" in lowered:
+            return AIError(
+                message=f"SSL certificate verification failed (proxy/VPN): {msg}",
+                category="ssl",
+                retryable=True,
             )
 
         return AIError(

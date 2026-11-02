@@ -42,6 +42,7 @@ class AssistantOrchestrator:
             max_output_tokens=self.settings.ai.max_output_tokens,
             timeout_seconds=self.settings.ai.timeout_seconds,
             max_retries=self.settings.ai.max_retries,
+            ssl_verify=self.settings.ai.ssl_verify,
         )
         self.capture_service = capture_service or QuestionCaptureService()
         self.delivery_coordinator = delivery_coordinator or AnswerDeliveryCoordinator(settings=self.settings)

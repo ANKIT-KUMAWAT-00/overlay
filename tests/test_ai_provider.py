@@ -127,3 +127,48 @@ def test_response_validator_extracts_code_from_analysis_commentary():
     assert result.is_valid
     assert result.corrected_text == "class Solution:\n    def solveSudoku(self, board):\n        pass"
     assert "Extracted pure solution code" in result.warnings[0]
+
+
+def test_gemini_provider_ssl_verify_initialization():
+    from ai.gemini_provider import GeminiProvider
+
+    provider = GeminiProvider(api_key="fake-test-key", ssl_verify=False)
+    assert provider.ssl_verify is False
+    assert provider._client is not None
+
+    provider.set_ssl_verify(True)
+    assert provider.ssl_verify is True
+
+
+def test_gemini_provider_ssl_fallback_on_cert_error(monkeypatch):
+    from ai.gemini_provider import GeminiProvider
+    from unittest.mock import MagicMock
+    from google import genai
+
+    provider = GeminiProvider(api_key="fake-test-key", ssl_verify=True)
+    assert provider.ssl_verify is True
+
+    call_count = 0
+
+    def mock_generate_content(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            raise Exception("certificate verify failed: self signed certificate in certificate chain")
+        mock_resp = MagicMock()
+        mock_resp.text = "Hello world from recovered SSL connection"
+        mock_resp.candidates = []
+        return mock_resp
+
+    mock_client = MagicMock()
+    mock_client.models.generate_content = mock_generate_content
+
+    monkeypatch.setattr(genai, "Client", lambda *args, **kwargs: mock_client)
+    provider._client = mock_client
+
+    response = provider.generate_answer("test question")
+    assert response.is_success
+    assert response.text == "Hello world from recovered SSL connection"
+    assert provider.ssl_verify is False  # Automatically relaxed after self-signed cert was detected
+    assert call_count == 2
+
