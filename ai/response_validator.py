@@ -125,12 +125,23 @@ class ResponseValidator:
                     has_syntax_errors = False
                     warnings.append("Auto-repaired incomplete JSON braces.")
 
-        elif expected_format == OutputFormat.CODE:
-            # Check Python AST if it appears to be Python code
-            if self._looks_like_python(corrected):
+        elif expected_format in (
+            OutputFormat.CODE,
+            OutputFormat.CODE_CPP,
+            OutputFormat.CODE_PYTHON,
+            OutputFormat.CODE_JAVA,
+            OutputFormat.CODE_JS,
+        ):
+            if expected_format == OutputFormat.CODE_PYTHON or (
+                expected_format == OutputFormat.CODE and self._looks_like_python(corrected)
+            ):
                 py_valid, py_err = self._validate_python(corrected)
                 if not py_valid:
                     warnings.append(f"Python AST check notice: {py_err}")
+            elif expected_format == OutputFormat.CODE_CPP or self._looks_like_cpp(corrected):
+                cpp_valid, cpp_err = self._validate_cpp(corrected)
+                if not cpp_valid:
+                    warnings.append(f"C++ syntax check notice: {cpp_err}")
 
         # Step 4: Delimiter balance check
         balanced, delim_err = self._check_delimiter_balance(corrected)
@@ -182,8 +193,38 @@ class ResponseValidator:
         except Exception:
             return None
 
+    def _looks_like_cpp(self, text: str) -> bool:
+        """Determines if the snippet appears to be C++ code."""
+        cpp_patterns = [
+            r"#include\s*<",
+            r"using\s+namespace\s+std",
+            r"std::",
+            r"class\s+\w+\s*\{?\s*public\s*:",
+            r"int\s+main\s*\(",
+            r"vector<",
+            r"cout\s*<<",
+            r"cin\s*>>",
+            r"nullptr",
+            r"template\s*<",
+        ]
+        return any(re.search(p, text) for p in cpp_patterns)
+
     def _looks_like_python(self, text: str) -> bool:
-        return bool(re.search(r"^(?:import |from |def |class |if __name__ ==)", text, re.MULTILINE))
+        """Determines if the snippet appears to be Python code, ensuring C++ is not misclassified."""
+        if self._looks_like_cpp(text):
+            return False
+        # If semicolons end multiple lines and braces are present, it is not Python
+        if re.search(r";\s*$", text, re.MULTILINE) and ("{" in text or "}" in text):
+            return False
+        return bool(re.search(r"^(?:import |from |def |class \w+[(:]|if __name__ ==)", text, re.MULTILINE))
+
+    def _validate_cpp(self, text: str) -> tuple[bool, Optional[str]]:
+        """Performs sanity validation for C++ code: checks balanced braces and basic syntax."""
+        open_c = text.count("{")
+        close_c = text.count("}")
+        if open_c != close_c:
+            return False, f"Unbalanced braces in C++ code: {open_c} '{{' vs {close_c} '}}'"
+        return True, None
 
     def _validate_python(self, text: str) -> tuple[bool, Optional[str]]:
         try:
