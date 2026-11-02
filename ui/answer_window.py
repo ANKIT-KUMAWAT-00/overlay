@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from ai.response_validator import ValidationResult
+from platforms import exclude_window_from_screen_capture
 from logging_service.logger import get_logger
 
 logger = get_logger("ui.answer_window")
@@ -135,7 +136,8 @@ class AnswerWindow(QWidget):
         self._drag_position = QPoint()
         self.target_app_name = "Target Application"
 
-        self.resize(700, 520)
+        # Compact, non-obstructive Solution Window
+        self.resize(560, 320)
         self._init_ui()
 
     def _init_ui(self) -> None:
@@ -245,6 +247,7 @@ class AnswerWindow(QWidget):
         self.show()
         self.raise_()
         self.activateWindow()
+        exclude_window_from_screen_capture(self)
 
     def center_on_screen(self) -> None:
         from PySide6.QtGui import QGuiApplication
