@@ -129,7 +129,14 @@ class AssistantOrchestrator:
                 prompt_text = (
                     manual_prompt.strip()
                     if (manual_prompt and manual_prompt.strip())
-                    else "Carefully read and analyze the screen. If this is a coding problem or task, output ONLY the complete, working code solution ready to be executed (omit problem analysis, explanation essays, and complexity analysis). If it is a multiple choice or other task, give the exact direct answer."
+                    else (
+                        "Carefully read and analyze the screen. If this is a coding problem or task: detect the "
+                        "intended programming language from the question, code editor stub, or instructions "
+                        "(e.g. C++, Java, Python, JavaScript, Go, etc. - especially check if C++ / cpp is requested "
+                        "or provided in the starter template), and output ONLY the complete, working code solution "
+                        "in that exact language ready to be executed/compiled (omit problem analysis, explanation essays, "
+                        "and complexity analysis). If it is a multiple choice or other task, give the exact direct answer."
+                    )
                 )
                 captured = CapturedQuestion(
                     text=prompt_text,
