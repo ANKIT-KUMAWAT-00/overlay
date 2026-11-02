@@ -71,19 +71,35 @@ class ApplicationDetector:
     COMM_SIGNATURES = [
         "slack", "teams", "discord", "telegram", "whatsapp", "signal", "mail", "outlook",
     ]
+    SELF_SIGNATURES = [
+        "python", "python3", "omniassist", "python.app", "electron",
+    ]
 
     def __init__(self) -> None:
         self.platform = get_platform_service()
+        self._last_external_app: Optional[DetectedApplication] = None
 
     def detect_active_application(self) -> DetectedApplication:
         """
         Determines current active application and its classification category.
+        Filters out OmniAssist itself to preserve the true target application.
         """
         app_info = self.platform.get_active_app_info()
         name = app_info.get("app_name", "Unknown")
         bundle = app_info.get("bundle_id", "")
         title = app_info.get("window_title", "")
         pid = app_info.get("pid", 0)
+
+        # Detect if the frontmost process is OmniAssist / Python itself
+        is_self = (
+            any(sig == name.lower() or sig in name.lower() for sig in self.SELF_SIGNATURES)
+            or ("omniassist" in bundle.lower())
+            or ("omniassist" in title.lower())
+        )
+
+        if is_self and self._last_external_app is not None:
+            logger.debug("Foreground is OmniAssist; preserving previous target: %s", self._last_external_app.name)
+            return self._last_external_app
 
         search_str = f"{name} {bundle} {title}".lower()
 
@@ -118,7 +134,7 @@ class ApplicationDetector:
             title,
         )
 
-        return DetectedApplication(
+        detected = DetectedApplication(
             name=name,
             category=category,
             bundle_id=bundle,
@@ -127,3 +143,8 @@ class ApplicationDetector:
             is_browser=is_browser,
             is_code_editor=is_code_editor,
         )
+
+        if not is_self and name != "Unknown":
+            self._last_external_app = detected
+
+        return detected if not is_self else (self._last_external_app or detected)
