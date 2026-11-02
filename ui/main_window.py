@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from ai.provider import OutputFormat
+from platforms import exclude_window_from_screen_capture
 from logging_service.logger import get_logger
 
 logger = get_logger("ui.main_window")
@@ -41,9 +42,9 @@ QLabel#AppBadge {
     background-color: #1e2230;
     color: #93c5fd;
     border: 1px solid #3b82f6;
-    border-radius: 10px;
-    padding: 3px 10px;
-    font-size: 11px;
+    border-radius: 8px;
+    padding: 2px 8px;
+    font-size: 10px;
     font-weight: bold;
 }
 
@@ -51,9 +52,9 @@ QLabel#StatusBadge {
     background-color: #1e293b;
     color: #38bdf8;
     border: 1px solid #0284c7;
-    border-radius: 10px;
-    padding: 3px 10px;
-    font-size: 11px;
+    border-radius: 8px;
+    padding: 2px 8px;
+    font-size: 10px;
     font-weight: bold;
 }
 
@@ -61,10 +62,10 @@ QPlainTextEdit {
     background-color: #181b24;
     color: #f9fafb;
     border: 1px solid #2d3345;
-    border-radius: 8px;
-    padding: 10px;
+    border-radius: 6px;
+    padding: 6px 8px;
     font-family: "SF Mono", Menlo, Consolas, monospace;
-    font-size: 13px;
+    font-size: 12px;
     selection-background-color: #4f46e5;
 }
 
@@ -76,9 +77,9 @@ QComboBox {
     background-color: #1e2230;
     color: #e5e7eb;
     border: 1px solid #374151;
-    border-radius: 6px;
-    padding: 5px 10px;
-    font-size: 12px;
+    border-radius: 5px;
+    padding: 3px 8px;
+    font-size: 11px;
 }
 
 QComboBox::drop-down {
@@ -89,9 +90,9 @@ QPushButton {
     background-color: #272c3d;
     color: #f3f4f6;
     border: 1px solid #3b4259;
-    border-radius: 6px;
-    padding: 7px 14px;
-    font-size: 12px;
+    border-radius: 5px;
+    padding: 5px 10px;
+    font-size: 11px;
     font-weight: 600;
 }
 
@@ -149,12 +150,13 @@ class MainWindow(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self._drag_position = QPoint()
 
-        self.resize(680, 480)
+        # Compact, sleek HUD dimensions
+        self.resize(520, 220)
         self._init_ui()
 
     def _init_ui(self) -> None:
         outer_layout = QVBoxLayout(self)
-        outer_layout.setContentsMargins(10, 10, 10, 10)
+        outer_layout.setContentsMargins(6, 6, 6, 6)
 
         # Central container widget
         container = QFrame(self)
@@ -163,20 +165,20 @@ class MainWindow(QWidget):
 
         # Subtle drop shadow
         shadow = QGraphicsDropShadowEffect(self)
-        shadow.setBlurRadius(24)
+        shadow.setBlurRadius(20)
         shadow.setXOffset(0)
-        shadow.setYOffset(8)
+        shadow.setYOffset(6)
         shadow.setColor(Qt.GlobalColor.black)
         container.setGraphicsEffect(shadow)
 
         layout = QVBoxLayout(container)
-        layout.setContentsMargins(16, 14, 16, 14)
-        layout.setSpacing(12)
+        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setSpacing(8)
 
         # Top Bar
         top_bar = QHBoxLayout()
         title_label = QLabel("✨ OmniAssist")
-        title_label.setFont(QFont("Arial", 13, QFont.Weight.Bold))
+        title_label.setFont(QFont("Arial", 11, QFont.Weight.Bold))
 
         self.app_badge = QLabel("Target: None")
         self.app_badge.setObjectName("AppBadge")
@@ -185,14 +187,14 @@ class MainWindow(QWidget):
         self.status_badge.setObjectName("StatusBadge")
 
         top_bar.addWidget(title_label)
-        top_bar.addSpacing(8)
-        top_bar.addWidget(self.app_badge)
         top_bar.addSpacing(6)
+        top_bar.addWidget(self.app_badge)
+        top_bar.addSpacing(4)
         top_bar.addWidget(self.status_badge)
         top_bar.addStretch()
 
         btn_close = QPushButton("✕")
-        btn_close.setFixedSize(26, 26)
+        btn_close.setFixedSize(22, 22)
         btn_close.setObjectName("SecondaryButton")
         btn_close.clicked.connect(self.hide_hud)
         top_bar.addWidget(btn_close)
@@ -201,6 +203,7 @@ class MainWindow(QWidget):
 
         # Question / Prompt Editor
         self.prompt_editor = QPlainTextEdit()
+        self.prompt_editor.setMaximumHeight(85)
         self.prompt_editor.setPlaceholderText(
             "Selected text or captured context will appear here automatically.\n"
             "You can also freely type or edit your instructions here..."
@@ -209,6 +212,7 @@ class MainWindow(QWidget):
 
         # Bottom Bar: Mode selector and action buttons
         bottom_bar = QHBoxLayout()
+        bottom_bar.setSpacing(6)
 
         lbl_format = QLabel("Format:")
         bottom_bar.addWidget(lbl_format)
@@ -216,22 +220,26 @@ class MainWindow(QWidget):
         self.format_combo = QComboBox()
         self.format_combo.addItems([
             "Auto Detect",
-            "Code Only",
+            "Code (Auto Language)",
+            "Code (C++)",
+            "Code (Python)",
+            "Code (Java)",
+            "Code (JS / TS)",
             "Multiple Choice",
-            "Theory / Explanation",
-            "JSON Object",
             "Short Answer",
+            "JSON Object",
+            "Theory / Explanation",
         ])
         bottom_bar.addWidget(self.format_combo)
 
-        bottom_bar.addSpacing(10)
+        bottom_bar.addSpacing(4)
 
-        btn_screen = QPushButton("📷 Read Screen")
+        btn_screen = QPushButton("📷 Screen")
         btn_screen.setToolTip("Capture full screen photo and solve via Gemini Vision")
         btn_screen.clicked.connect(self.capture_screen_requested.emit)
         bottom_bar.addWidget(btn_screen)
 
-        btn_snip = QPushButton("✂ Snip Region")
+        btn_snip = QPushButton("✂ Snip")
         btn_snip.clicked.connect(self.capture_region_requested.emit)
         bottom_bar.addWidget(btn_snip)
 
@@ -243,7 +251,7 @@ class MainWindow(QWidget):
 
         bottom_bar.addStretch()
 
-        self.btn_generate = QPushButton("⚡ Generate Answer")
+        self.btn_generate = QPushButton("⚡ Generate")
         self.btn_generate.setObjectName("PrimaryButton")
         self.btn_generate.clicked.connect(self._on_generate_clicked)
         bottom_bar.addWidget(self.btn_generate)
@@ -268,10 +276,14 @@ class MainWindow(QWidget):
         mapping = [
             OutputFormat.AUTO,
             OutputFormat.CODE,
+            OutputFormat.CODE_CPP,
+            OutputFormat.CODE_PYTHON,
+            OutputFormat.CODE_JAVA,
+            OutputFormat.CODE_JS,
             OutputFormat.MULTIPLE_CHOICE,
-            OutputFormat.THEORY,
-            OutputFormat.JSON,
             OutputFormat.SHORT_ANSWER,
+            OutputFormat.JSON,
+            OutputFormat.THEORY,
         ]
         return mapping[idx] if idx < len(mapping) else OutputFormat.AUTO
 
@@ -295,6 +307,7 @@ class MainWindow(QWidget):
         self.raise_()
         self.activateWindow()
         self.prompt_editor.setFocus()
+        exclude_window_from_screen_capture(self)
 
     def hide_hud(self) -> None:
         self.hide()
