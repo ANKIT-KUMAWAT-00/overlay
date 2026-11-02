@@ -7,10 +7,12 @@ from .tray_manager import TrayManager
 from .main_window import MainWindow
 from .answer_window import AnswerWindow
 from .settings_window import SettingsWindow
+from .snipping_overlay import SnippingOverlay
 
 __all__ = [
     "TrayManager",
     "MainWindow",
     "AnswerWindow",
     "SettingsWindow",
+    "SnippingOverlay",
 ]
