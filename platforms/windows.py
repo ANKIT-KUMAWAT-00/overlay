@@ -24,6 +24,23 @@ class WindowsPlatform:
         """On Windows, standard desktop apps have access by default unless blocked by UAC/UIPI."""
         return True
 
+    def exclude_window_from_screen_capture(self, qwidget: Any) -> bool:
+        """
+        Excludes window from capture on Windows 10 (2004+) / Windows 11 using
+        SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE = 0x00000011).
+        """
+        try:
+            windll = getattr(ctypes, "windll", None)
+            if not windll:
+                return False
+            hwnd = int(qwidget.winId())
+            WDA_EXCLUDEFROMCAPTURE = 0x00000011
+            res = windll.user32.SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE)
+            return bool(res)
+        except Exception as exc:
+            logger.debug("Failed to set SetWindowDisplayAffinity: %s", exc)
+            return False
+
     def get_active_app_info(self) -> Dict[str, Any]:
         """
         Retrieves active foreground window title, process ID, and application name.
